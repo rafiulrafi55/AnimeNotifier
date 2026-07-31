@@ -74,7 +74,7 @@ Built using:
 ### Clone
 
 ```bash
-git clone https://github.com/yourusername/AnimeNotifier.git
+git clone https://github.com/rafiulrafi55/AnimeNotifier.git
 ```
 
 ### Open
