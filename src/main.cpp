@@ -340,10 +340,10 @@ enum MainMenuItem
     MAIN_MENU_REBOOT
 };
 
-enum RebootConfirmItem
+enum RebootActionItem
 {
-    REBOOT_CONFIRM_NO,
-    REBOOT_CONFIRM_YES
+    REBOOT_ACTION_REBOOT,
+    REBOOT_ACTION_POWER_OFF
 };
 
 enum SettingsMenuItem
@@ -400,7 +400,7 @@ SettingsMenuItem selectedSettingsMenu = SETTINGS_DEFAULT;
 TitleSourceItem selectedTitleSource = TITLE_SOURCE_MOVIES;
 AnimeActionItem selectedAnimeAction = ANIME_ACTION_DONE;
 SelectionMode selectionMode = SELECTION_MODE_ANIME;
-RebootConfirmItem rebootConfirmItem = REBOOT_CONFIRM_NO;
+RebootActionItem rebootActionItem = REBOOT_ACTION_REBOOT;
 DeviceSettingsItem selectedDeviceSetting = DEVICE_SETTING_BRIGHTNESS;
 int aboutInfoLineIndex = 0;
 bool homeCursorActive = false;
@@ -510,6 +510,7 @@ const unsigned long LOW_POWER_WAKE_IGNORE_MS = 600;
 
 void setRightLedBrightness(uint8_t duty);
 void enterLowPowerSleep();
+void enterMenuPowerOffSleep();
 void refreshAutomaticLowPowerMode(int batteryLevel);
 void triggerLeftLedFlashPattern(unsigned long durationMs);
 bool displayedMoviesChanged(const String previousTitles[3], const String previousDates[3]);
@@ -779,6 +780,27 @@ void enterLowPowerSleep()
 
     displaySleeping = false;
     display.setPowerSave(0);
+    applyDisplayBrightness();
+    lastInteractionAt = millis();
+    wakeIgnoreUntil = millis() + LOW_POWER_WAKE_IGNORE_MS;
+}
+
+void enterMenuPowerOffSleep()
+{
+    digitalWrite(BUZZER_PIN, LOW);
+    digitalWrite(LEFT_LED_PIN, LOW);
+    setRightLedBrightness(0);
+
+    display.setPowerSave(1);
+    gpio_wakeup_enable(static_cast<gpio_num_t>(BTN_OK), GPIO_INTR_LOW_LEVEL);
+    esp_sleep_enable_gpio_wakeup();
+    esp_light_sleep_start();
+    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_GPIO);
+
+    display.setPowerSave(0);
+    currentScreen = SCREEN_HOME;
+    homeCursorActive = false;
+    displaySleeping = false;
     applyDisplayBrightness();
     lastInteractionAt = millis();
     wakeIgnoreUntil = millis() + LOW_POWER_WAKE_IGNORE_MS;
@@ -2510,7 +2532,7 @@ if(currentScreen == SCREEN_TITLE_DETAILS)
                 break;
 
             case MAIN_MENU_REBOOT:
-                rebootConfirmItem = REBOOT_CONFIRM_NO;
+                rebootActionItem = REBOOT_ACTION_REBOOT;
                 currentScreen = SCREEN_REBOOT_CONFIRM;
                 okPress = false;
                 break;
@@ -2552,20 +2574,20 @@ if(currentScreen == SCREEN_REBOOT_CONFIRM)
     display.setFont(u8g2_font_5x7_tr);
 
     if(leftPress || rightPress)
-        rebootConfirmItem = rebootConfirmItem == REBOOT_CONFIRM_NO ? REBOOT_CONFIRM_YES : REBOOT_CONFIRM_NO;
+        rebootActionItem = rebootActionItem == REBOOT_ACTION_REBOOT ? REBOOT_ACTION_POWER_OFF : REBOOT_ACTION_REBOOT;
 
     if(okPress)
     {
-        if(rebootConfirmItem == REBOOT_CONFIRM_YES)
+        if(rebootActionItem == REBOOT_ACTION_REBOOT)
             ESP.restart();
         else
-            currentScreen = SCREEN_MENU;
+            enterMenuPowerOffSleep();
 
         okPress = false;
     }
 
-    display.drawStr(20, 40, rebootConfirmItem == REBOOT_CONFIRM_NO ? "> No" : "  No");
-    display.drawStr(74, 40, rebootConfirmItem == REBOOT_CONFIRM_YES ? "> Yes" : "  Yes");
+    display.drawStr(16, 40, rebootActionItem == REBOOT_ACTION_REBOOT ? "> Reboot" : "  Reboot");
+    display.drawStr(60, 40, rebootActionItem == REBOOT_ACTION_POWER_OFF ? "> Power off" : "  Power off");
 }
 
 if(currentScreen == SCREEN_SETTINGS_EMPTY)
