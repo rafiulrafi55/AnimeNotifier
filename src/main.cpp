@@ -302,7 +302,6 @@ const char *ABOUT_INFO_LINES[] = {
 
 const int ABOUT_INFO_LINE_COUNT = 3;
 
-const unsigned long UPDATE_INTERVAL = 900000; 
 const unsigned long LOAD_RETRY_INTERVAL = 15000;
 // 15 minutes
 
@@ -327,7 +326,8 @@ enum Screen
     SCREEN_SETTINGS_DONE,
     SCREEN_REBOOT_CONFIRM,
     SCREEN_BATTERY_INFO,
-    SCREEN_ABOUT
+    SCREEN_ABOUT,
+    SCREEN_TITLE_DETAILS
 };
 
 enum MainMenuItem
@@ -357,10 +357,18 @@ enum DeviceSettingsItem
     DEVICE_SETTING_BRIGHTNESS,
     DEVICE_SETTING_LED,
     DEVICE_SETTING_BUZZER,
-    DEVICE_SETTING_LOW_POWER
+    DEVICE_SETTING_LOW_POWER,
+    DEVICE_SETTING_AUTO_LOW_POWER_TRIGGER,
+    DEVICE_SETTING_BUZZER_LEAD_TIME,
+    DEVICE_SETTING_REFRESH_INTERVAL,
+    DEVICE_SETTING_HOME_CURSOR_DEFAULT,
+    DEVICE_SETTING_DETAIL_AUTORETURN,
+    DEVICE_SETTING_SCREEN_TIMEOUT,
+    DEVICE_SETTING_CLOCK_FORMAT,
+    DEVICE_SETTING_DESCRIPTION_SOURCE
 };
 
-const int DEVICE_SETTINGS_COUNT = 4;
+const int DEVICE_SETTINGS_COUNT = 12;
 
 enum TitleSourceItem
 {
@@ -380,6 +388,12 @@ enum SelectionMode
     SELECTION_MODE_MOVIES
 };
 
+enum HomeDetailSource
+{
+    HOME_DETAIL_ANIME,
+    HOME_DETAIL_MOVIE
+};
+
 Screen currentScreen = SCREEN_HOME;
 MainMenuItem selectedMenu = MAIN_MENU_WIFI;
 SettingsMenuItem selectedSettingsMenu = SETTINGS_DEFAULT;
@@ -389,6 +403,45 @@ SelectionMode selectionMode = SELECTION_MODE_ANIME;
 RebootConfirmItem rebootConfirmItem = REBOOT_CONFIRM_NO;
 DeviceSettingsItem selectedDeviceSetting = DEVICE_SETTING_BRIGHTNESS;
 int aboutInfoLineIndex = 0;
+bool homeCursorActive = false;
+int homeCursorIndex = 0;
+HomeDetailSource homeDetailSource = HOME_DETAIL_ANIME;
+int homeDetailItemIndex = 0;
+int homeDetailScrollRow = 0;
+unsigned long homeDetailOpenedAt = 0;
+int settingsMenuTop = 0;
+int refreshIntervalIndex = 1;
+bool homeCursorDefaultEnabled = false;
+int detailAutoReturnIndex = 1;
+int screenTimeoutIndex = 2;
+bool clock24HourEnabled = true;
+bool detailSummaryOnly = false;
+int autoLowPowerTriggerIndex = 1;
+int buzzerLeadTimeIndex = 3;
+const int HOME_CURSOR_SLOT_COUNT = 6;
+const int DETAIL_CHARS_PER_ROW = 31;
+const int DETAIL_VISIBLE_ROWS = 8;
+const int SETTINGS_VISIBLE_ITEMS = 5;
+
+const unsigned long REFRESH_INTERVAL_OPTIONS[] = {300000UL, 900000UL, 1800000UL, 3600000UL};
+const char *REFRESH_INTERVAL_LABELS[] = {"5m", "15m", "30m", "60m"};
+const int REFRESH_INTERVAL_COUNT = sizeof(REFRESH_INTERVAL_OPTIONS) / sizeof(REFRESH_INTERVAL_OPTIONS[0]);
+
+const int AUTO_LOW_POWER_TRIGGER_OPTIONS[] = {5, 10, 15, -1};
+const char *AUTO_LOW_POWER_TRIGGER_LABELS[] = {"5%", "10%", "15%", "Never"};
+const int AUTO_LOW_POWER_TRIGGER_COUNT = sizeof(AUTO_LOW_POWER_TRIGGER_OPTIONS) / sizeof(AUTO_LOW_POWER_TRIGGER_OPTIONS[0]);
+
+const unsigned long BUZZER_LEAD_TIME_OPTIONS[] = {120000UL, 300000UL, 600000UL, 0UL};
+const char *BUZZER_LEAD_TIME_LABELS[] = {"2m", "5m", "10m", "On time"};
+const int BUZZER_LEAD_TIME_COUNT = sizeof(BUZZER_LEAD_TIME_OPTIONS) / sizeof(BUZZER_LEAD_TIME_OPTIONS[0]);
+
+const unsigned long DETAIL_AUTORETURN_OPTIONS[] = {0UL, 10000UL, 30000UL, 60000UL};
+const char *DETAIL_AUTORETURN_LABELS[] = {"Off", "10s", "30s", "60s"};
+const int DETAIL_AUTORETURN_COUNT = sizeof(DETAIL_AUTORETURN_OPTIONS) / sizeof(DETAIL_AUTORETURN_OPTIONS[0]);
+
+const unsigned long SCREEN_TIMEOUT_OPTIONS[] = {0UL, 30000UL, 60000UL, 120000UL, 300000UL};
+const char *SCREEN_TIMEOUT_LABELS[] = {"Off", "30s", "1m", "2m", "5m"};
+const int SCREEN_TIMEOUT_COUNT = sizeof(SCREEN_TIMEOUT_OPTIONS) / sizeof(SCREEN_TIMEOUT_OPTIONS[0]);
 
 enum WifiMenuItem
 {
@@ -453,7 +506,6 @@ unsigned long wakeIgnoreUntil = 0;
 bool lowPowerManualOverrideOff = false;
 const uint8_t BRIGHTNESS_LEVELS[] = {64, 128, 192, 255};
 const int BRIGHTNESS_LEVEL_COUNT = sizeof(BRIGHTNESS_LEVELS) / sizeof(BRIGHTNESS_LEVELS[0]);
-const unsigned long LOW_POWER_DISPLAY_TIMEOUT = 120000;
 const unsigned long LOW_POWER_WAKE_IGNORE_MS = 600;
 
 void setRightLedBrightness(uint8_t duty);
@@ -650,6 +702,14 @@ void saveUiSettings()
     prefs.putBool("led", ledAlertsEnabled);
     prefs.putBool("buzzer", buzzerAlertsEnabled);
     prefs.putBool("low_power", lowPowerModeEnabled);
+    prefs.putInt("auto_lp_idx", autoLowPowerTriggerIndex);
+    prefs.putInt("refresh_idx", refreshIntervalIndex);
+    prefs.putBool("cursor_default", homeCursorDefaultEnabled);
+    prefs.putInt("detail_auto", detailAutoReturnIndex);
+    prefs.putInt("screen_timeout", screenTimeoutIndex);
+    prefs.putBool("clock_24", clock24HourEnabled);
+    prefs.putBool("detail_summary", detailSummaryOnly);
+    prefs.putInt("buzzer_lead_idx", buzzerLeadTimeIndex);
     prefs.end();
 }
 
@@ -731,6 +791,14 @@ void loadUiSettings()
     ledAlertsEnabled = prefs.getBool("led", true);
     buzzerAlertsEnabled = prefs.getBool("buzzer", true);
     lowPowerModeEnabled = prefs.getBool("low_power", false);
+    autoLowPowerTriggerIndex = prefs.getInt("auto_lp_idx", autoLowPowerTriggerIndex);
+    refreshIntervalIndex = prefs.getInt("refresh_idx", refreshIntervalIndex);
+    homeCursorDefaultEnabled = prefs.getBool("cursor_default", false);
+    detailAutoReturnIndex = prefs.getInt("detail_auto", detailAutoReturnIndex);
+    screenTimeoutIndex = prefs.getInt("screen_timeout", screenTimeoutIndex);
+    clock24HourEnabled = prefs.getBool("clock_24", true);
+    detailSummaryOnly = prefs.getBool("detail_summary", false);
+    buzzerLeadTimeIndex = prefs.getInt("buzzer_lead_idx", buzzerLeadTimeIndex);
     prefs.end();
 
     if(brightnessLevelIndex < 0)
@@ -738,6 +806,33 @@ void loadUiSettings()
 
     if(brightnessLevelIndex >= BRIGHTNESS_LEVEL_COUNT)
         brightnessLevelIndex = BRIGHTNESS_LEVEL_COUNT - 1;
+
+    if(refreshIntervalIndex < 0)
+        refreshIntervalIndex = 0;
+    if(refreshIntervalIndex >= REFRESH_INTERVAL_COUNT)
+        refreshIntervalIndex = REFRESH_INTERVAL_COUNT - 1;
+
+    if(autoLowPowerTriggerIndex < 0)
+        autoLowPowerTriggerIndex = 0;
+    if(autoLowPowerTriggerIndex >= AUTO_LOW_POWER_TRIGGER_COUNT)
+        autoLowPowerTriggerIndex = AUTO_LOW_POWER_TRIGGER_COUNT - 1;
+
+    if(buzzerLeadTimeIndex < 0)
+        buzzerLeadTimeIndex = 0;
+    if(buzzerLeadTimeIndex >= BUZZER_LEAD_TIME_COUNT)
+        buzzerLeadTimeIndex = BUZZER_LEAD_TIME_COUNT - 1;
+
+    if(detailAutoReturnIndex < 0)
+        detailAutoReturnIndex = 0;
+    if(detailAutoReturnIndex >= DETAIL_AUTORETURN_COUNT)
+        detailAutoReturnIndex = DETAIL_AUTORETURN_COUNT - 1;
+
+    if(screenTimeoutIndex < 0)
+        screenTimeoutIndex = 0;
+    if(screenTimeoutIndex >= SCREEN_TIMEOUT_COUNT)
+        screenTimeoutIndex = SCREEN_TIMEOUT_COUNT - 1;
+
+    homeCursorActive = homeCursorDefaultEnabled;
 }
 
 String currentTimeLabel()
@@ -749,9 +844,301 @@ String currentTimeLabel()
     struct tm nowTime;
     localtime_r(&nowRaw, &nowTime);
 
-    char buffer[6];
-    snprintf(buffer, sizeof(buffer), "%02d:%02d", nowTime.tm_hour, nowTime.tm_min);
+    char buffer[12];
+    if(clock24HourEnabled)
+    {
+        snprintf(buffer, sizeof(buffer), "%02d:%02d", nowTime.tm_hour, nowTime.tm_min);
+    }
+    else
+    {
+        int hour = nowTime.tm_hour;
+        const char *suffix = hour >= 12 ? "PM" : "AM";
+        hour = hour % 12;
+        if(hour == 0)
+            hour = 12;
+
+        snprintf(buffer, sizeof(buffer), "%d:%02d%s", hour, nowTime.tm_min, suffix);
+    }
+
     return String(buffer);
+}
+
+unsigned long refreshIntervalMs()
+{
+    if(refreshIntervalIndex < 0)
+        refreshIntervalIndex = 0;
+
+    if(refreshIntervalIndex >= REFRESH_INTERVAL_COUNT)
+        refreshIntervalIndex = REFRESH_INTERVAL_COUNT - 1;
+
+    return REFRESH_INTERVAL_OPTIONS[refreshIntervalIndex];
+}
+
+int autoLowPowerTriggerPercent()
+{
+    if(autoLowPowerTriggerIndex < 0)
+        autoLowPowerTriggerIndex = 0;
+
+    if(autoLowPowerTriggerIndex >= AUTO_LOW_POWER_TRIGGER_COUNT)
+        autoLowPowerTriggerIndex = AUTO_LOW_POWER_TRIGGER_COUNT - 1;
+
+    return AUTO_LOW_POWER_TRIGGER_OPTIONS[autoLowPowerTriggerIndex];
+}
+
+unsigned long buzzerLeadTimeMs()
+{
+    if(buzzerLeadTimeIndex < 0)
+        buzzerLeadTimeIndex = 0;
+
+    if(buzzerLeadTimeIndex >= BUZZER_LEAD_TIME_COUNT)
+        buzzerLeadTimeIndex = BUZZER_LEAD_TIME_COUNT - 1;
+
+    return BUZZER_LEAD_TIME_OPTIONS[buzzerLeadTimeIndex];
+}
+
+unsigned long detailAutoReturnMs()
+{
+    if(detailAutoReturnIndex < 0)
+        detailAutoReturnIndex = 0;
+
+    if(detailAutoReturnIndex >= DETAIL_AUTORETURN_COUNT)
+        detailAutoReturnIndex = DETAIL_AUTORETURN_COUNT - 1;
+
+    return DETAIL_AUTORETURN_OPTIONS[detailAutoReturnIndex];
+}
+
+unsigned long screenTimeoutMs()
+{
+    if(screenTimeoutIndex < 0)
+        screenTimeoutIndex = 0;
+
+    if(screenTimeoutIndex >= SCREEN_TIMEOUT_COUNT)
+        screenTimeoutIndex = SCREEN_TIMEOUT_COUNT - 1;
+
+    return SCREEN_TIMEOUT_OPTIONS[screenTimeoutIndex];
+}
+
+String shortenDescription(const String &text)
+{
+    if(text.length() == 0)
+        return "No description available.";
+
+    int sentenceEnd = text.indexOf('.');
+    if(sentenceEnd > 0)
+    {
+        int endIndex = sentenceEnd + 1;
+        if(endIndex > 160)
+            endIndex = 160;
+
+        return text.substring(0, endIndex);
+    }
+
+    if(text.length() > 160)
+        return text.substring(0, 160);
+
+    return text;
+}
+
+String activeDetailDescription();
+
+String detailDescriptionForScreen()
+{
+    String description = activeDetailDescription();
+    return detailSummaryOnly ? shortenDescription(description) : description;
+}
+
+const char *selectedRefreshIntervalLabel()
+{
+    return REFRESH_INTERVAL_LABELS[refreshIntervalIndex];
+}
+
+const char *selectedDetailAutoReturnLabel()
+{
+    return DETAIL_AUTORETURN_LABELS[detailAutoReturnIndex];
+}
+
+const char *selectedScreenTimeoutLabel()
+{
+    return SCREEN_TIMEOUT_LABELS[screenTimeoutIndex];
+}
+
+String selectedClockFormatLabel()
+{
+    return clock24HourEnabled ? String("24 Hour") : String("12 Hour");
+}
+
+String selectedDescriptionSourceLabel()
+{
+    return detailSummaryOnly ? String("Short") : String("Full");
+}
+
+String selectedAutoLowPowerTriggerLabel()
+{
+    return String(AUTO_LOW_POWER_TRIGGER_LABELS[autoLowPowerTriggerIndex]);
+}
+
+String selectedBuzzerLeadTimeLabel()
+{
+    return String(BUZZER_LEAD_TIME_LABELS[buzzerLeadTimeIndex]);
+}
+
+const char *deviceSettingLabel(DeviceSettingsItem item)
+{
+    switch(item)
+    {
+        case DEVICE_SETTING_BRIGHTNESS:
+            return "Brightness";
+        case DEVICE_SETTING_LED:
+            return "LED Alerts";
+        case DEVICE_SETTING_BUZZER:
+            return "Buzzer";
+        case DEVICE_SETTING_LOW_POWER:
+            return "Low Power";
+        case DEVICE_SETTING_AUTO_LOW_POWER_TRIGGER:
+            return "Auto Low Power";
+        case DEVICE_SETTING_BUZZER_LEAD_TIME:
+            return "Buzzer Alert";
+        case DEVICE_SETTING_REFRESH_INTERVAL:
+            return "Refresh Interval";
+        case DEVICE_SETTING_HOME_CURSOR_DEFAULT:
+            return "Home Cursor";
+        case DEVICE_SETTING_DETAIL_AUTORETURN:
+            return "Detail Return";
+        case DEVICE_SETTING_SCREEN_TIMEOUT:
+            return "Screen Sleep";
+        case DEVICE_SETTING_CLOCK_FORMAT:
+            return "Clock Format";
+        case DEVICE_SETTING_DESCRIPTION_SOURCE:
+            return "Desc Source";
+    }
+
+    return "Setting";
+}
+
+String deviceSettingValue(DeviceSettingsItem item)
+{
+    switch(item)
+    {
+        case DEVICE_SETTING_BRIGHTNESS:
+            return String(brightnessLabelForIndex(effectiveBrightnessLevelIndex()));
+
+        case DEVICE_SETTING_LED:
+            return ledAlertsEnabled ? String("On") : String("Off");
+
+        case DEVICE_SETTING_BUZZER:
+            return buzzerAlertsEnabled ? String("On") : String("Off");
+
+        case DEVICE_SETTING_LOW_POWER:
+            return lowPowerModeEnabled ? String("On") : String("Off");
+
+        case DEVICE_SETTING_AUTO_LOW_POWER_TRIGGER:
+            return selectedAutoLowPowerTriggerLabel();
+
+        case DEVICE_SETTING_BUZZER_LEAD_TIME:
+            return selectedBuzzerLeadTimeLabel();
+
+        case DEVICE_SETTING_REFRESH_INTERVAL:
+            return String(selectedRefreshIntervalLabel());
+
+        case DEVICE_SETTING_HOME_CURSOR_DEFAULT:
+            return homeCursorDefaultEnabled ? String("On") : String("Off");
+
+        case DEVICE_SETTING_DETAIL_AUTORETURN:
+            return String(selectedDetailAutoReturnLabel());
+
+        case DEVICE_SETTING_SCREEN_TIMEOUT:
+            return String(selectedScreenTimeoutLabel());
+
+        case DEVICE_SETTING_CLOCK_FORMAT:
+            return selectedClockFormatLabel();
+
+        case DEVICE_SETTING_DESCRIPTION_SOURCE:
+            return selectedDescriptionSourceLabel();
+    }
+
+    return String("Off");
+}
+
+void changeDeviceSettingValue(DeviceSettingsItem item)
+{
+    switch(item)
+    {
+        case DEVICE_SETTING_BRIGHTNESS:
+            brightnessLevelIndex++;
+            if(brightnessLevelIndex >= BRIGHTNESS_LEVEL_COUNT)
+                brightnessLevelIndex = 0;
+
+            applyDisplayBrightness();
+            break;
+
+        case DEVICE_SETTING_LED:
+            ledAlertsEnabled = !ledAlertsEnabled;
+            if(!ledAlertsEnabled)
+            {
+                digitalWrite(LEFT_LED_PIN, LOW);
+                setRightLedBrightness(0);
+            }
+            break;
+
+        case DEVICE_SETTING_BUZZER:
+            buzzerAlertsEnabled = !buzzerAlertsEnabled;
+            if(!buzzerAlertsEnabled)
+            {
+                selectedAnimeAlertBeepOn = false;
+                digitalWrite(BUZZER_PIN, LOW);
+            }
+            else if(!lowPowerModeEnabled)
+            {
+                digitalWrite(BUZZER_PIN, HIGH);
+                delay(70);
+                digitalWrite(BUZZER_PIN, LOW);
+            }
+            break;
+
+        case DEVICE_SETTING_LOW_POWER:
+            lowPowerModeEnabled = !lowPowerModeEnabled;
+            if(lowPowerModeEnabled)
+                lowPowerManualOverrideOff = false;
+            else
+                lowPowerManualOverrideOff = true;
+            applyLowPowerModeState();
+            break;
+
+        case DEVICE_SETTING_AUTO_LOW_POWER_TRIGGER:
+            autoLowPowerTriggerIndex = (autoLowPowerTriggerIndex + 1) % AUTO_LOW_POWER_TRIGGER_COUNT;
+            break;
+
+        case DEVICE_SETTING_BUZZER_LEAD_TIME:
+            buzzerLeadTimeIndex = (buzzerLeadTimeIndex + 1) % BUZZER_LEAD_TIME_COUNT;
+            break;
+
+        case DEVICE_SETTING_REFRESH_INTERVAL:
+            refreshIntervalIndex = (refreshIntervalIndex + 1) % REFRESH_INTERVAL_COUNT;
+            break;
+
+        case DEVICE_SETTING_HOME_CURSOR_DEFAULT:
+            homeCursorDefaultEnabled = !homeCursorDefaultEnabled;
+            homeCursorActive = homeCursorDefaultEnabled;
+            break;
+
+        case DEVICE_SETTING_DETAIL_AUTORETURN:
+            detailAutoReturnIndex = (detailAutoReturnIndex + 1) % DETAIL_AUTORETURN_COUNT;
+            break;
+
+        case DEVICE_SETTING_SCREEN_TIMEOUT:
+            screenTimeoutIndex = (screenTimeoutIndex + 1) % SCREEN_TIMEOUT_COUNT;
+            break;
+
+        case DEVICE_SETTING_CLOCK_FORMAT:
+            clock24HourEnabled = !clock24HourEnabled;
+            break;
+
+        case DEVICE_SETTING_DESCRIPTION_SOURCE:
+            detailSummaryOnly = !detailSummaryOnly;
+            break;
+    }
+
+    saveUiSettings();
 }
 
 String trimDisplayText(const String &text, size_t maxChars)
@@ -780,6 +1167,97 @@ void silenceSelectedAnimeAlert()
 
     selectedAnimeAlertBeepOn = false;
     digitalWrite(BUZZER_PIN, LOW);
+}
+
+bool homeCursorSelectionAvailable()
+{
+    if(homeCursorIndex < 0 || homeCursorIndex >= HOME_CURSOR_SLOT_COUNT)
+        return false;
+
+    if(homeCursorIndex < 3)
+        return animeList[homeCursorIndex].title.length() > 0;
+
+    int movieIndex = homeCursorIndex - 3;
+    return movies[movieIndex].title.length() > 0;
+}
+
+void openHomeCursorDetails()
+{
+    if(!homeCursorSelectionAvailable())
+        return;
+
+    if(homeCursorIndex < 3)
+    {
+        homeDetailSource = HOME_DETAIL_ANIME;
+        homeDetailItemIndex = homeCursorIndex;
+    }
+    else
+    {
+        homeDetailSource = HOME_DETAIL_MOVIE;
+        homeDetailItemIndex = homeCursorIndex - 3;
+    }
+
+    homeDetailScrollRow = 0;
+    homeDetailOpenedAt = millis();
+    currentScreen = SCREEN_TITLE_DETAILS;
+}
+
+String activeDetailDescription()
+{
+    String description;
+
+    if(homeDetailSource == HOME_DETAIL_ANIME)
+    {
+        int index = homeDetailItemIndex;
+        if(index < 0)
+            index = 0;
+        if(index > 2)
+            index = 2;
+
+        description = animeList[index].description;
+    }
+    else
+    {
+        int index = homeDetailItemIndex;
+        if(index < 0)
+            index = 0;
+        if(index > 2)
+            index = 2;
+
+        description = movies[index].description;
+    }
+
+    if(description.length() == 0)
+        description = "No description available.";
+
+    return description;
+}
+
+int wrappedRowCount(const String &text, int charsPerRow)
+{
+    if(charsPerRow <= 0)
+        return 1;
+
+    if(text.length() == 0)
+        return 1;
+
+    return (text.length() + charsPerRow - 1) / charsPerRow;
+}
+
+String wrappedRowSlice(const String &text, int rowIndex, int charsPerRow)
+{
+    if(charsPerRow <= 0 || rowIndex < 0)
+        return "";
+
+    int start = rowIndex * charsPerRow;
+    if(start >= static_cast<int>(text.length()))
+        return "";
+
+    int end = start + charsPerRow;
+    if(end > static_cast<int>(text.length()))
+        end = text.length();
+
+    return text.substring(start, end);
 }
 
 void setRightLedBrightness(uint8_t duty)
@@ -826,7 +1304,15 @@ void drawBatteryStatusIcon(U8G2 &oled, int x, int y, int width, int height, int 
 
 void refreshAutomaticLowPowerMode(int batteryLevel)
 {
-    if(batteryLevel >= 11)
+    int triggerPercent = autoLowPowerTriggerPercent();
+
+    if(triggerPercent < 0)
+    {
+        lowPowerManualOverrideOff = false;
+        return;
+    }
+
+    if(batteryLevel > triggerPercent)
     {
         lowPowerManualOverrideOff = false;
         return;
@@ -891,6 +1377,7 @@ void updateAlertOutputs(int batteryLevel)
     {
         time_t now = time(nullptr);
         time_t airingAt = selectedAnimeAlertAiringAt;
+        time_t leadTime = static_cast<time_t>(buzzerLeadTimeMs() / 1000UL);
 
         if(ledAlertsActive() && now < airingAt && isSameLocalDay(now, airingAt))
         {
@@ -921,7 +1408,7 @@ void updateAlertOutputs(int batteryLevel)
             setRightLedBrightness(0);
         }
 
-        if(now >= airingAt && selectedAnimeAlertMutedAiringAt != selectedAnimeAlertAiringAt)
+        if(now >= (airingAt - leadTime) && selectedAnimeAlertMutedAiringAt != selectedAnimeAlertAiringAt)
             shouldBeep = true;
     }
 
@@ -1620,7 +2107,8 @@ void loop()
             if(anyInteraction)
                 lastInteractionAt = millis();
 
-            if(millis() - lastInteractionAt >= LOW_POWER_DISPLAY_TIMEOUT)
+            unsigned long timeoutMs = screenTimeoutMs();
+            if(timeoutMs > 0 && millis() - lastInteractionAt >= timeoutMs)
             {
                 displaySleeping = true;
                 enterLowPowerSleep();
@@ -1652,7 +2140,27 @@ void loop()
     drawHeader(display, batteryLevel, lowPowerModeEnabled, headerTime.c_str(), currentSSID.c_str());
 
     if(currentScreen == SCREEN_HOME && (leftPress || rightPress))
+    {
         silenceSelectedAnimeAlert();
+
+        if(!homeCursorActive)
+        {
+            if(leftPress && !rightPress)
+                homeCursorIndex = HOME_CURSOR_SLOT_COUNT - 1;
+            else
+                homeCursorIndex = 0;
+
+            homeCursorActive = true;
+        }
+        else if(leftPress && !rightPress)
+        {
+            homeCursorIndex = (homeCursorIndex + HOME_CURSOR_SLOT_COUNT - 1) % HOME_CURSOR_SLOT_COUNT;
+        }
+        else if(rightPress && !leftPress)
+        {
+            homeCursorIndex = (homeCursorIndex + 1) % HOME_CURSOR_SLOT_COUNT;
+        }
+    }
 
     if(wifiConnecting && WiFi.status() != WL_CONNECTED && millis() - wifiConnectStart > 20000)
     {
@@ -1660,10 +2168,14 @@ void loop()
         wifiConnectionFailed = true;
     }
 
-    // Prioritize opening the menu before any network fetch work.
+    // Prioritize home actions before any network fetch work.
     if(currentScreen == SCREEN_HOME && okPress)
     {
-        currentScreen = SCREEN_MENU;
+        if(homeCursorActive)
+            openHomeCursorDetails();
+        else
+            currentScreen = SCREEN_MENU;
+
         okPress = false;
     }
 
@@ -1682,7 +2194,7 @@ void loop()
 
         // Keep title refresh timers active on all screens while connected.
         {
-            unsigned long movieInterval = moviesLoaded ? UPDATE_INTERVAL : LOAD_RETRY_INTERVAL;
+            unsigned long movieInterval = moviesLoaded ? refreshIntervalMs() : LOAD_RETRY_INTERVAL;
             if(now - movieUpdateTimer > movieInterval)
             {
                 bool hadMovieRows = moviesLoaded;
@@ -1712,7 +2224,7 @@ void loop()
                 }
             }
 
-            unsigned long animeInterval = animeLoaded ? UPDATE_INTERVAL : LOAD_RETRY_INTERVAL;
+            unsigned long animeInterval = animeLoaded ? refreshIntervalMs() : LOAD_RETRY_INTERVAL;
             if(now - animeUpdateTimer > animeInterval)
             {
                 long previousSelectedAnimeAlertAiringAt = selectedAnimeAlertAiringAt;
@@ -1766,6 +2278,18 @@ void loop()
     }
 
     updateAlertOutputs(batteryLevel);
+
+    if(currentScreen == SCREEN_HOME && okLongPress && homeCursorActive)
+    {
+        homeCursorActive = false;
+        okLongPress = false;
+    }
+
+    if(currentScreen == SCREEN_TITLE_DETAILS && okLongPress)
+    {
+        currentScreen = SCREEN_HOME;
+        okLongPress = false;
+    }
 
     // Keep long-press back behavior on deeper screens.
     if(okLongPress)
@@ -1836,6 +2360,7 @@ if(currentScreen == SCREEN_HOME)
     const int movieX = 66;
     const int titleWidth = 60;
     unsigned long scrollNow = millis();
+    bool cursorBlinkVisible = ((millis() / 350) % 2) == 0;
 
 
     bool showStatusOnly = (!wifiHasSavedCredentials && !wifiConnecting && !wifiConnectionFailed) || wifiConnecting || wifiConnectionFailed;
@@ -1867,9 +2392,12 @@ if(currentScreen == SCREEN_HOME)
             {
                 int y = 20 + i*14;
 
+                bool hideAnimeTitle = homeCursorActive && homeCursorIndex == i && !cursorBlinkVisible;
+                bool hideMovieTitle = homeCursorActive && homeCursorIndex == (i + 3) && !cursorBlinkVisible;
 
                 // Anime left
-                drawScrollingText(display, animeX, y, titleWidth, animeList[i].title, scrollNow);
+                if(!hideAnimeTitle)
+                    drawScrollingText(display, animeX, y, titleWidth, animeList[i].title, scrollNow);
 
                 display.drawStr(
                     animeX,
@@ -1879,7 +2407,8 @@ if(currentScreen == SCREEN_HOME)
 
 
                 // Movie title
-                drawScrollingText(display, movieX, y, titleWidth, movies[i].title, scrollNow);
+                if(!hideMovieTitle)
+                    drawScrollingText(display, movieX, y, titleWidth, movies[i].title, scrollNow);
 
 
                 // Date
@@ -1890,6 +2419,39 @@ if(currentScreen == SCREEN_HOME)
                 );
             }
         }
+    }
+}
+
+if(currentScreen == SCREEN_TITLE_DETAILS)
+{
+    display.setFont(u8g2_font_4x6_tr);
+
+    String description = detailDescriptionForScreen();
+    int totalRows = wrappedRowCount(description, DETAIL_CHARS_PER_ROW);
+    int maxScrollRow = totalRows > DETAIL_VISIBLE_ROWS ? (totalRows - DETAIL_VISIBLE_ROWS) : 0;
+
+    unsigned long autoReturnMs = detailAutoReturnMs();
+    if(autoReturnMs > 0 && millis() - homeDetailOpenedAt >= autoReturnMs)
+    {
+        currentScreen = SCREEN_HOME;
+        homeDetailScrollRow = 0;
+    }
+
+    if(leftPress && homeDetailScrollRow > 0)
+        homeDetailScrollRow--;
+
+    if(rightPress && homeDetailScrollRow < maxScrollRow)
+        homeDetailScrollRow++;
+
+    for(int row = 0; row < DETAIL_VISIBLE_ROWS; row++)
+    {
+        int contentRow = homeDetailScrollRow + row;
+        if(contentRow >= totalRows)
+            break;
+
+        String line = wrappedRowSlice(description, contentRow, DETAIL_CHARS_PER_ROW);
+        int y = 18 + (row * 6);
+        display.drawStr(1, y, line.c_str());
     }
 }
 
@@ -1925,6 +2487,7 @@ if(currentScreen == SCREEN_HOME)
 
             case MAIN_MENU_SETTINGS:
                 selectedDeviceSetting = DEVICE_SETTING_BRIGHTNESS;
+                settingsMenuTop = 0;
                 currentScreen = SCREEN_SETTINGS_EMPTY;
                 okPress = false;
                 break;
@@ -2007,13 +2570,16 @@ if(currentScreen == SCREEN_REBOOT_CONFIRM)
 
 if(currentScreen == SCREEN_SETTINGS_EMPTY)
 {
-    display.setFont(u8g2_font_5x7_tr);
+    display.setFont(u8g2_font_4x6_tr);
 
     if(leftPress)
     {
         int currentItem = static_cast<int>(selectedDeviceSetting);
         currentItem = (currentItem - 1 + DEVICE_SETTINGS_COUNT) % DEVICE_SETTINGS_COUNT;
         selectedDeviceSetting = static_cast<DeviceSettingsItem>(currentItem);
+
+        if(selectedDeviceSetting < settingsMenuTop)
+            settingsMenuTop = (selectedDeviceSetting >= SETTINGS_VISIBLE_ITEMS - 1) ? selectedDeviceSetting - SETTINGS_VISIBLE_ITEMS + 1 : 0;
     }
 
     if(rightPress)
@@ -2021,74 +2587,31 @@ if(currentScreen == SCREEN_SETTINGS_EMPTY)
         int currentItem = static_cast<int>(selectedDeviceSetting);
         currentItem = (currentItem + 1) % DEVICE_SETTINGS_COUNT;
         selectedDeviceSetting = static_cast<DeviceSettingsItem>(currentItem);
+
+        if(selectedDeviceSetting < settingsMenuTop)
+            settingsMenuTop = 0;
+
+        if(selectedDeviceSetting >= settingsMenuTop + SETTINGS_VISIBLE_ITEMS)
+            settingsMenuTop = selectedDeviceSetting - SETTINGS_VISIBLE_ITEMS + 1;
     }
 
     if(okPress)
     {
-        switch(selectedDeviceSetting)
-        {
-            case DEVICE_SETTING_BRIGHTNESS:
-                brightnessLevelIndex++;
-                if(brightnessLevelIndex >= BRIGHTNESS_LEVEL_COUNT)
-                    brightnessLevelIndex = 0;
-
-                applyDisplayBrightness();
-                saveUiSettings();
-                break;
-
-            case DEVICE_SETTING_LED:
-                ledAlertsEnabled = !ledAlertsEnabled;
-                if(!ledAlertsEnabled)
-                {
-                    digitalWrite(LEFT_LED_PIN, LOW);
-                    setRightLedBrightness(0);
-                }
-                saveUiSettings();
-                break;
-
-            case DEVICE_SETTING_BUZZER:
-                buzzerAlertsEnabled = !buzzerAlertsEnabled;
-                if(!buzzerAlertsEnabled)
-                {
-                    selectedAnimeAlertBeepOn = false;
-                    digitalWrite(BUZZER_PIN, LOW);
-                }
-                else if(!lowPowerModeEnabled)
-                {
-                    digitalWrite(BUZZER_PIN, HIGH);
-                    delay(70);
-                    digitalWrite(BUZZER_PIN, LOW);
-                }
-                saveUiSettings();
-                break;
-
-            case DEVICE_SETTING_LOW_POWER:
-                lowPowerModeEnabled = !lowPowerModeEnabled;
-                if(lowPowerModeEnabled)
-                    lowPowerManualOverrideOff = false;
-                else
-                    lowPowerManualOverrideOff = true;
-                applyLowPowerModeState();
-                saveUiSettings();
-                break;
-        }
-
+        changeDeviceSettingValue(selectedDeviceSetting);
         okPress = false;
     }
 
-    const char *brightnessLabel = brightnessLabelForIndex(effectiveBrightnessLevelIndex());
+    for(int i = 0; i < SETTINGS_VISIBLE_ITEMS; i++)
+    {
+        int index = settingsMenuTop + i;
+        if(index >= DEVICE_SETTINGS_COUNT)
+            break;
 
-    String brightnessLine = String(selectedDeviceSetting == DEVICE_SETTING_BRIGHTNESS ? "> " : "  ") + "Brightness: " + brightnessLabel;
-    display.drawStr(2, 24, brightnessLine.c_str());
-
-    String ledLine = String(selectedDeviceSetting == DEVICE_SETTING_LED ? "> " : "  ") + "LED Alerts: " + (ledAlertsActive() ? "On" : "Off");
-    display.drawStr(2, 34, ledLine.c_str());
-
-    String buzzerLine = String(selectedDeviceSetting == DEVICE_SETTING_BUZZER ? "> " : "  ") + "Buzzer: " + (buzzerAlertsActive() ? "On" : "Off");
-    display.drawStr(2, 44, buzzerLine.c_str());
-
-    String lowPowerLine = String(selectedDeviceSetting == DEVICE_SETTING_LOW_POWER ? "> " : "  ") + "Low Power: " + (lowPowerModeEnabled ? "On" : "Off");
-    display.drawStr(2, 54, lowPowerLine.c_str());
+        int y = 20 + (i * 9);
+        DeviceSettingsItem item = static_cast<DeviceSettingsItem>(index);
+        String line = String(selectedDeviceSetting == item ? "> " : "  ") + deviceSettingLabel(item) + ": " + deviceSettingValue(item);
+        display.drawStr(1, y, line.c_str());
+    }
 }
 
 if(currentScreen == SCREEN_BATTERY_INFO)

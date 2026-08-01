@@ -1,31 +1,44 @@
 # 📺 AnimeNotifier for ESP32-C3
 
-A compact ESP32-C3 powered anime release notifier featuring a monochrome OLED display, Wi-Fi connectivity, and a simple three-button interface. AnimeNotifier automatically checks for newly released anime episodes and displays notifications directly on the device.
-It also shows movies on one side.
+A compact ESP32-C3 powered anime and movie notifier with a monochrome OLED display, Wi-Fi connectivity, on-device title browsing, configurable alerts, and a three-button interface.
 
-Initial version only supports 3 animes and refreshes every 15 minutes (9000000)
+Current firmware release: V1.0.3
+
+### V1.0.3
+
+- Added the operating manual LED behavior guide.
+- Kept the firmware version in sync with the current release tag.
+
+The firmware tracks up to 3 anime entries and 3 movie entries on the home screen, supports title detail pages, and refreshes online data on a configurable interval.
 
 ---
 
 ## ✨ Features
 
-- 📡 Wi-Fi connectivity
-- 📺 Check for newly released anime episodes
-- 🔔 New episode notifications *(If you add the buzzer)*
-- 📱 128×64 OLED user interface
+- 📡 Wi-Fi connectivity with automatic reconnect and saved credentials
+- 📺 Anime episode tracking from AniList
+- 🎬 Upcoming movie tracking from TMDB
+- 🏠 Home screen title browsing with a blinking selection cursor
+- 📄 Title detail screens with wrapped descriptions and scrolling
+- 🔔 Configurable buzzer alerts before airing time
+- 💡 Left LED status signaling for loading, errors, and alerts
+- 📱 128×64 SH1106 OLED interface
 - 🎮 Three-button navigation
-- ⚡ Fast and lightweight
-- 🔄 Automatic refresh
-- 🌙 Low power ESP32-C3 platform
+- 🔄 Configurable refresh interval: 5, 15, 30, or 60 minutes
+- 🌙 Automatic low power mode with selectable battery trigger
 - 🔋 Real-time battery level indicator
+- 🕒 12-hour or 24-hour clock format
+- 💤 Configurable display sleep timeout
 
 ---
 
 ## 📷 Preview
 
-> *(Coming Soon)*
-
-
+<p align="center">
+    <img src="img/img1.jpg" alt="AnimeNotifier preview 1" width="240" />
+    <img src="img/img2.jpg" alt="AnimeNotifier preview 2" width="240" />
+    <img src="img/img3.jpg" alt="AnimeNotifier preview 3" width="240" />
+</p>
 
 ## 🛠 Hardware
 
@@ -35,26 +48,44 @@ Initial version only supports 3 animes and refreshes every 15 minutes (9000000)
 
 ### Components
 
-- 128×64 OLED (SH1106/SSD1306 I²C)
+- 128×64 OLED (SH1106 I²C)
 - ESP32-C3 SuperMini
 - 3 Push Buttons
 - 5v Active Buzzer
-- J1059 Module 
+- Left and right status LEDs
+- J1059 module
 - 900 mAh battery
+
+### Current Firmware Settings
+
+- Brightness
+- LED alerts
+- Buzzer alerts
+- Low power mode
+- Auto low power trigger: 5%, 10%, 15%, or Never
+- Buzzer lead time: 2m before, 5m before, 10m before, or on time
+- Refresh interval: 5m, 15m, 30m, or 60m
+- Home cursor default on boot
+- Detail screen auto-return timeout
+- Screen sleep timeout
+- Clock format: 12-hour or 24-hour
+- Description source: full or short summary
 
 ---
 
 ## 📌 Pin Configuration
 
-| Component | GPIO |
-|-----------|-----:|
-| OLED SDA | GPIO8 |
-| OLED SCL | GPIO9 |
-| UP Button | GPIO7 |
-| DOWN Button | GPIO3 |
-| OK Button | GPIO6 |
-| Battery ADC | GPIO01 |
-| Buzzer *(Optional)* | Configure in source |
+| Component | GPIO | Notes |
+|-----------|-----:|-------|
+| OLED SDA | GPIO8 | SH1106 I²C data |
+| OLED SCL | GPIO9 | SH1106 I²C clock |
+| OK Button | GPIO6 | Short press/select, long press/back |
+| Left Button | GPIO7 | Home cursor / list navigation |
+| Right Button | GPIO3 | Home cursor / list navigation |
+| Battery ADC | GPIO0 | Battery voltage sensing |
+| Buzzer | GPIO21 | Active buzzer output |
+| Left LED | GPIO20 | Status / alert indicator |
+| Right LED | GPIO1 | PWM alert indicator |
 
 ---
 
@@ -103,15 +134,9 @@ pio run --target upload
 
 ## 🚀 Planned Features
 
-- [ ] MAL authentication
-- [ ] AniList authentication
 - [ ] OTA firmware updates
-- [ ] Multiple anime tracking
-- [ ] Episode countdown timer
 - [ ] Timezone selection
-- [ ] Deep sleep mode
 - [ ] Custom notification sounds
-- [ ] Brightness control
 - [ ] Watch history
 
 ---

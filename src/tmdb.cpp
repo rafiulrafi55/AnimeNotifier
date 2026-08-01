@@ -13,6 +13,39 @@ int seasonMovieCount = 0;
 String selectedMovieTitles[MAX_MOVIE_CHOICES];
 int selectedMovieTitleCount = 0;
 
+static String normalizeDescription(const String &raw)
+{
+    if(raw.length() == 0)
+        return "No description available.";
+
+    String cleaned;
+    cleaned.reserve(raw.length());
+    bool previousWasSpace = false;
+
+    for(size_t i = 0; i < raw.length(); i++)
+    {
+        char c = raw[i];
+        bool isSpace = c == '\n' || c == '\r' || c == '\t' || c == ' ';
+
+        if(isSpace)
+        {
+            if(!previousWasSpace)
+            {
+                cleaned += ' ';
+                previousWasSpace = true;
+            }
+        }
+        else
+        {
+            cleaned += c;
+            previousWasSpace = false;
+        }
+    }
+
+    cleaned.trim();
+    return cleaned.length() > 0 ? cleaned : "No description available.";
+}
+
 static int currentYearValue()
 {
     time_t nowRaw = time(nullptr);
@@ -126,6 +159,7 @@ bool fetchMovies()
         String date;
         int popularity;
         bool selected;
+        String description;
     };
 
     MovieCandidate candidates[20];
@@ -145,6 +179,7 @@ bool fetchMovies()
         candidates[candidateCount].date = formatDate(release);
         candidates[candidateCount].popularity = item["popularity"].as<int>();
         candidates[candidateCount].selected = isSelectedMovieTitle(candidates[candidateCount].title);
+        candidates[candidateCount].description = normalizeDescription(item["overview"].as<String>());
         candidateCount++;
     }
 
@@ -168,6 +203,7 @@ bool fetchMovies()
         movies[i].title = "";
         movies[i].date = "";
         movies[i].popularity = 0;
+        movies[i].description = "";
     }
 
     int outputIndex = 0;
@@ -182,6 +218,7 @@ bool fetchMovies()
             movies[outputIndex].title = candidates[i].title;
             movies[outputIndex].date = candidates[i].date;
             movies[outputIndex].popularity = candidates[i].popularity;
+            movies[outputIndex].description = candidates[i].description;
             movieCount++;
             outputIndex++;
             break;
@@ -195,6 +232,7 @@ bool fetchMovies()
             movies[outputIndex].title = candidates[i].title;
             movies[outputIndex].date = candidates[i].date;
             movies[outputIndex].popularity = candidates[i].popularity;
+            movies[outputIndex].description = candidates[i].description;
             movieCount++;
             outputIndex++;
             continue;
@@ -206,6 +244,7 @@ bool fetchMovies()
         movies[outputIndex].title = candidates[i].title;
         movies[outputIndex].date = candidates[i].date;
         movies[outputIndex].popularity = candidates[i].popularity;
+        movies[outputIndex].description = candidates[i].description;
         movieCount++;
         outputIndex++;
     }

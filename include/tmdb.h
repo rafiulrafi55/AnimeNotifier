@@ -8,6 +8,7 @@ struct Movie
     String title;
     String date;
     int popularity;
+    String description;
 };
 
 struct MovieChoice

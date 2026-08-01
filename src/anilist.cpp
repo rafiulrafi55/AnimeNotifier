@@ -50,6 +50,39 @@ static bool isSelectedAnimeTitle(const String &title)
     return false;
 }
 
+static String normalizeDescription(const String &raw)
+{
+    if(raw.length() == 0)
+        return "No description available.";
+
+    String cleaned;
+    cleaned.reserve(raw.length());
+    bool previousWasSpace = false;
+
+    for(size_t i = 0; i < raw.length(); i++)
+    {
+        char c = raw[i];
+        bool isSpace = c == '\n' || c == '\r' || c == '\t' || c == ' ';
+
+        if(isSpace)
+        {
+            if(!previousWasSpace)
+            {
+                cleaned += ' ';
+                previousWasSpace = true;
+            }
+        }
+        else
+        {
+            cleaned += c;
+            previousWasSpace = false;
+        }
+    }
+
+    cleaned.trim();
+    return cleaned.length() > 0 ? cleaned : "No description available.";
+}
+
 String formatAnimeTime(long timestamp)
 {
     if (timestamp <= 0)
@@ -114,14 +147,17 @@ bool fetchAnime()
 
     String query = R"(
     {
-            Page(page:PAGE_PLACEHOLDER, perPage:100)
+                        Page(page:PAGE_PLACEHOLDER, perPage:25)
       {
         pageInfo { hasNextPage }
                     airingSchedules(sort: TIME, airingAt_greater: NOW_PLACEHOLDER)
         {
                     airingAt
                     episode
-                    media { title { romaji } }
+                                        media {
+                                                title { romaji }
+                                                description(asHtml:false)
+                                        }
         }
       }
     }
@@ -132,6 +168,7 @@ bool fetchAnime()
         String title;
         String time;
         long airingAt;
+        String description;
     };
 
     bool useSelectedPriority = selectedAnimeTitleCount > 0;
@@ -139,6 +176,7 @@ bool fetchAnime()
     AnimeRow generalRows[3];
     int generalCount = 0;
     bool hasSelectedRow = false;
+    bool hadAnyApiSuccess = false;
     int targetGeneralCount = useSelectedPriority ? 2 : 3;
 
     for(int page = 1; page <= 20; page++)
@@ -156,9 +194,14 @@ bool fetchAnime()
 
         if (code != 200)
         {
+            if(hadAnyApiSuccess)
+                break;
+
             http.end();
             return false;
         }
+
+        hadAnyApiSuccess = true;
 
         String payload = http.getString();
 
@@ -167,6 +210,9 @@ bool fetchAnime()
         DeserializationError error = deserializeJson(doc, payload);
         if (error)
         {
+            if(hadAnyApiSuccess)
+                break;
+
             http.end();
             return false;
         }
@@ -185,6 +231,7 @@ bool fetchAnime()
             String title = item["media"]["title"]["romaji"] | "Unknown Title";
             long airing = item["airingAt"] | 0;
             String timeLabel = formatAnimeTimeLabel(airing);
+            String description = normalizeDescription(item["media"]["description"].as<String>());
 
             if(isSelectedAnimeTitle(title))
             {
@@ -193,6 +240,7 @@ bool fetchAnime()
                     selectedRow.title = title;
                     selectedRow.time = timeLabel;
                     selectedRow.airingAt = airing;
+                    selectedRow.description = description;
                     hasSelectedRow = true;
                 }
 
@@ -220,6 +268,7 @@ bool fetchAnime()
                 generalRows[generalCount].title = title;
                 generalRows[generalCount].time = timeLabel;
                 generalRows[generalCount].airingAt = airing;
+                generalRows[generalCount].description = description;
                 generalCount++;
             }
         }
@@ -233,6 +282,7 @@ bool fetchAnime()
         animeList[i].title = "";
         animeList[i].time = "";
         animeList[i].airingAt = 0;
+        animeList[i].description = "";
     }
 
     int outputIndex = 0;
@@ -242,6 +292,7 @@ bool fetchAnime()
         animeList[0].title = selectedRow.title;
         animeList[0].time = selectedRow.time;
         animeList[0].airingAt = selectedRow.airingAt;
+        animeList[0].description = selectedRow.description;
         outputIndex = 1;
     }
 
@@ -250,11 +301,12 @@ bool fetchAnime()
         animeList[outputIndex].title = generalRows[i].title;
         animeList[outputIndex].time = generalRows[i].time;
         animeList[outputIndex].airingAt = generalRows[i].airingAt;
+        animeList[outputIndex].description = generalRows[i].description;
         outputIndex++;
     }
 
     http.end();
-    return true;
+    return outputIndex > 0;
 }
 
 void fetchSeasonAnimeChoices()

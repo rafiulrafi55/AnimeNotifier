@@ -10,6 +10,7 @@ struct Anime
     String title;
     String time;
     long airingAt;
+    String description;
 };
 
 struct AnimeChoice

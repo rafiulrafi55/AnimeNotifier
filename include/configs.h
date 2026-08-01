@@ -2,6 +2,6 @@
 #define CONFIG_H
 
 #define FW_NAME "AnimeNotify"
-#define FW_VERSION "1.0.0"
+#define FW_VERSION "1.0.3"
 
 #endif
