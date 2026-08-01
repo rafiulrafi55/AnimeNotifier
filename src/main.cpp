@@ -10,9 +10,8 @@
 #include "time_manager.h"
 #include "anime.h"
 #include "anilist.h"
+#include "pins.h"
 
-
-#define BUZZER 21
 
 bool wifiScanned = false;
 String currentSSID = "";
@@ -27,6 +26,14 @@ unsigned long animeUpdateTimer = 0;
 
 bool moviesLoaded = false;
 bool animeLoaded = false;
+long selectedAnimeAlertAiringAt = 0;
+long selectedAnimeAlertMutedAiringAt = 0;
+bool selectedAnimeAlertBeepOn = false;
+unsigned long selectedAnimeAlertToggleAt = 0;
+
+const int RIGHT_LED_PWM_CHANNEL = 0;
+const int RIGHT_LED_PWM_FREQUENCY = 5000;
+const int RIGHT_LED_PWM_RESOLUTION = 8;
 
 const unsigned long UPDATE_INTERVAL = 900000; 
 // 15 minutes
@@ -77,11 +84,18 @@ enum AnimeActionItem
     ANIME_ACTION_CANCEL
 };
 
+enum SelectionMode
+{
+    SELECTION_MODE_ANIME,
+    SELECTION_MODE_MOVIES
+};
+
 Screen currentScreen = SCREEN_HOME;
 MainMenuItem selectedMenu = MAIN_MENU_WIFI;
 SettingsMenuItem selectedSettingsMenu = SETTINGS_DEFAULT;
 TitleSourceItem selectedTitleSource = TITLE_SOURCE_MOVIES;
 AnimeActionItem selectedAnimeAction = ANIME_ACTION_DONE;
+SelectionMode selectionMode = SELECTION_MODE_ANIME;
 
 enum WifiMenuItem
 {
@@ -142,8 +156,11 @@ String selectedAnimeTitles[MAX_ANIME_CHOICES];
 int selectedAnimeTitleCount = 0;
 int seasonAnimeCursor = 0;
 int seasonAnimeTop = 0;
+int seasonMovieCursor = 0;
+int seasonMovieTop = 0;
 unsigned long selectionDoneUntil = 0;
 const int VISIBLE_ANIME_CHOICES = 7;
+const int VISIBLE_MOVIE_CHOICES = 7;
 
 bool animeTitleIsSelected(const String &title)
 {
@@ -197,10 +214,74 @@ void saveSelectedAnimeTitles()
     prefs.end();
 }
 
+bool movieTitleIsSelected(const String &title)
+{
+    for(int i = 0; i < selectedMovieTitleCount; i++)
+    {
+        if(selectedMovieTitles[i] == title)
+            return true;
+    }
+
+    return false;
+}
+
+void loadSelectedMovieTitles()
+{
+    selectedMovieTitleCount = 0;
+
+    prefs.begin("movie", true);
+    String stored = prefs.getString("titles", "");
+    prefs.end();
+
+    while(stored.length() > 0 && selectedMovieTitleCount < MAX_MOVIE_CHOICES)
+    {
+        int separator = stored.indexOf('\n');
+        String entry = separator >= 0 ? stored.substring(0, separator) : stored;
+        entry.trim();
+
+        if(entry.length() > 0)
+            selectedMovieTitles[selectedMovieTitleCount++] = entry;
+
+        if(separator < 0)
+            break;
+
+        stored = stored.substring(separator + 1);
+    }
+}
+
+void saveSelectedMovieTitles()
+{
+    String stored;
+
+    for(int i = 0; i < selectedMovieTitleCount; i++)
+    {
+        if(i > 0)
+            stored += '\n';
+
+        stored += selectedMovieTitles[i];
+    }
+
+    prefs.begin("movie", false);
+    prefs.putString("titles", stored);
+    prefs.end();
+}
+
 void clearSelectedAnimeTitles()
 {
     selectedAnimeTitleCount = 0;
+    selectedAnimeAlertAiringAt = 0;
+    selectedAnimeAlertMutedAiringAt = 0;
+    selectedAnimeAlertBeepOn = false;
+    digitalWrite(BUZZER_PIN, LOW);
     prefs.begin("anime", false);
+    prefs.putString("titles", "");
+    prefs.end();
+}
+
+void clearSelectedMovieTitles()
+{
+    selectedMovieTitleCount = 0;
+    prefs.begin("movie", false);
     prefs.putString("titles", "");
     prefs.end();
 }
@@ -227,12 +308,138 @@ void rebuildSelectedAnimeTitlesFromChoices()
     }
 }
 
+void syncSelectedMovieChoices()
+{
+    for(int i = 0; i < seasonMovieCount; i++)
+        seasonMovieChoices[i].selected = movieTitleIsSelected(seasonMovieChoices[i].title);
+}
+
+void rebuildSelectedMovieTitlesFromChoices()
+{
+    selectedMovieTitleCount = 0;
+
+    for(int i = 0; i < seasonMovieCount; i++)
+    {
+        if(!seasonMovieChoices[i].selected)
+            continue;
+
+        if(selectedMovieTitleCount >= MAX_MOVIE_CHOICES)
+            break;
+
+        selectedMovieTitles[selectedMovieTitleCount++] = seasonMovieChoices[i].title;
+    }
+}
+
 String trimDisplayText(const String &text, size_t maxChars)
 {
     if (text.length() <= maxChars)
         return text;
 
     return text.substring(0, maxChars);
+}
+
+bool isSameLocalDay(time_t first, time_t second)
+{
+    struct tm firstTime;
+    struct tm secondTime;
+
+    localtime_r(&first, &firstTime);
+    localtime_r(&second, &secondTime);
+
+    return firstTime.tm_year == secondTime.tm_year && firstTime.tm_yday == secondTime.tm_yday;
+}
+
+void silenceSelectedAnimeAlert()
+{
+    if(selectedAnimeAlertAiringAt > 0)
+        selectedAnimeAlertMutedAiringAt = selectedAnimeAlertAiringAt;
+
+    selectedAnimeAlertBeepOn = false;
+    digitalWrite(BUZZER_PIN, LOW);
+}
+
+void setRightLedBrightness(uint8_t duty)
+{
+    ledcWrite(RIGHT_LED_PWM_CHANNEL, duty);
+}
+
+void updateAlertOutputs(int batteryLevel)
+{
+    if(batteryLevel < 0)
+        batteryLevel = 0;
+
+    if(batteryLevel > 100)
+        batteryLevel = 100;
+
+    bool leftLedOn = batteryLevel < 20 && ((millis() / 500) % 2 == 0);
+
+    bool shouldBeep = false;
+
+    if(timeReady() && selectedAnimeAlertAiringAt > 0)
+    {
+        time_t now = time(nullptr);
+        time_t airingAt = selectedAnimeAlertAiringAt;
+
+        if(now < airingAt && isSameLocalDay(now, airingAt))
+        {
+            const unsigned long pulseMs = 3000;
+            const unsigned long gapMs = 60000;
+            const unsigned long cycleMs = pulseMs + gapMs;
+            unsigned long phase = millis() % cycleMs;
+
+            if(phase < pulseMs)
+            {
+                const unsigned long halfPulseMs = pulseMs / 2;
+                uint8_t duty;
+
+                if(phase < halfPulseMs)
+                    duty = map(phase, 0, halfPulseMs, 0, 255);
+                else
+                    duty = map(phase - halfPulseMs, 0, halfPulseMs, 255, 0);
+
+                setRightLedBrightness(duty);
+            }
+            else
+            {
+                setRightLedBrightness(0);
+            }
+        }
+        else
+        {
+            setRightLedBrightness(0);
+        }
+
+        if(now >= airingAt && selectedAnimeAlertMutedAiringAt != selectedAnimeAlertAiringAt)
+            shouldBeep = true;
+    }
+
+    if(shouldBeep)
+    {
+        const unsigned long beepInterval = 350;
+
+        if(!selectedAnimeAlertBeepOn)
+        {
+            selectedAnimeAlertBeepOn = true;
+            selectedAnimeAlertToggleAt = millis();
+            digitalWrite(BUZZER_PIN, HIGH);
+        }
+        else if(millis() - selectedAnimeAlertToggleAt >= beepInterval)
+        {
+            selectedAnimeAlertToggleAt = millis();
+            selectedAnimeAlertBeepOn = !selectedAnimeAlertBeepOn;
+            digitalWrite(BUZZER_PIN, selectedAnimeAlertBeepOn ? HIGH : LOW);
+        }
+    }
+    else
+    {
+        selectedAnimeAlertBeepOn = false;
+        digitalWrite(BUZZER_PIN, LOW);
+    }
+
+    digitalWrite(LEFT_LED_PIN, leftLedOn ? HIGH : LOW);
+
+    if(!(timeReady() && selectedAnimeAlertAiringAt > 0 && isSameLocalDay(time(nullptr), selectedAnimeAlertAiringAt) && time(nullptr) < selectedAnimeAlertAiringAt))
+        setRightLedBrightness(0);
 }
 
 void drawScrollingText(U8G2 &oled, int x, int y, int width, const String &text, unsigned long now)
@@ -330,8 +537,14 @@ void scanNetworks()
 void setup()
 {
   wifiInit();
-    pinMode(BUZZER, OUTPUT);
-    digitalWrite(BUZZER, LOW);
+        pinMode(BUZZER_PIN, OUTPUT);
+        pinMode(LEFT_LED_PIN, OUTPUT);
+        pinMode(RIGHT_LED_PIN, OUTPUT);
+    ledcSetup(RIGHT_LED_PWM_CHANNEL, RIGHT_LED_PWM_FREQUENCY, RIGHT_LED_PWM_RESOLUTION);
+    ledcAttachPin(RIGHT_LED_PIN, RIGHT_LED_PWM_CHANNEL);
+        digitalWrite(BUZZER_PIN, LOW);
+        digitalWrite(LEFT_LED_PIN, LOW);
+    setRightLedBrightness(0);
 
     displayInit();
 
@@ -372,6 +585,7 @@ else
 }
 
 loadSelectedAnimeTitles();
+loadSelectedMovieTitles();
 }
 
 
@@ -383,6 +597,7 @@ void loop()
     bool okLongPress = okLongPressed();
     bool leftPress = leftPressed();
     bool rightPress = rightPressed();
+    int batteryLevel = batteryPercent();
 
     display.clearBuffer();
     if(WiFi.status() == WL_CONNECTED)
@@ -394,7 +609,12 @@ void loop()
     currentSSID = WiFi.SSID();
 }
 
-    drawHeader(display, batteryPercent(), currentSSID.c_str());
+    drawHeader(display, batteryLevel, currentSSID.c_str());
+
+    if(currentScreen == SCREEN_HOME && (leftPress || rightPress))
+        silenceSelectedAnimeAlert();
+
+    updateAlertOutputs(batteryLevel);
 
     if(wifiConnecting && WiFi.status() != WL_CONNECTED && millis() - wifiConnectStart > 20000)
     {
@@ -424,7 +644,21 @@ void loop()
 
         if(now - animeUpdateTimer > UPDATE_INTERVAL || !animeLoaded)
         {
+            long previousSelectedAnimeAlertAiringAt = selectedAnimeAlertAiringAt;
+
             fetchAnime();
+
+            if(selectedAnimeTitleCount > 0 && animeTitleIsSelected(animeList[0].title))
+                selectedAnimeAlertAiringAt = animeList[0].airingAt;
+            else
+                selectedAnimeAlertAiringAt = 0;
+
+            if(selectedAnimeAlertAiringAt != previousSelectedAnimeAlertAiringAt)
+            {
+                selectedAnimeAlertMutedAiringAt = 0;
+                selectedAnimeAlertBeepOn = false;
+                digitalWrite(BUZZER_PIN, LOW);
+            }
 
             animeUpdateTimer = now;
 
@@ -454,6 +688,12 @@ void loop()
                 break;
 
             case SCREEN_SETTINGS_ANIME_LIST:
+                selectionMode = SELECTION_MODE_ANIME;
+                currentScreen = SCREEN_SETTINGS_ANIME_ACTION_MENU;
+                break;
+
+            case SCREEN_SETTINGS_MOVIES_COMING:
+                selectionMode = SELECTION_MODE_MOVIES;
                 currentScreen = SCREEN_SETTINGS_ANIME_ACTION_MENU;
                 break;
 
@@ -470,12 +710,8 @@ void loop()
                 currentScreen = SCREEN_SETTINGS;
                 break;
 
-            case SCREEN_SETTINGS_MOVIES_COMING:
-                currentScreen = SCREEN_SETTINGS_TITLE_MENU;
-                break;
-
             case SCREEN_SETTINGS_ANIME_ACTION_MENU:
-                currentScreen = SCREEN_SETTINGS_ANIME_LIST;
+                currentScreen = selectionMode == SELECTION_MODE_MOVIES ? SCREEN_SETTINGS_MOVIES_COMING : SCREEN_SETTINGS_ANIME_LIST;
                 break;
 
             case SCREEN_SETTINGS:
@@ -580,6 +816,7 @@ if(currentScreen == SCREEN_HOME)
                 break;
 
             case MAIN_MENU_SETTINGS:
+                selectedSettingsMenu = SETTINGS_DEFAULT;
                 currentScreen = SCREEN_SETTINGS;
                 okPress = false;
                 break;
@@ -970,7 +1207,9 @@ if(currentScreen == SCREEN_SETTINGS)
         {
             case SETTINGS_DEFAULT:
                 clearSelectedAnimeTitles();
+                clearSelectedMovieTitles();
                 animeLoaded = false;
+                moviesLoaded = false;
                 currentScreen = SCREEN_HOME;
                 okPress = false;
                 break;
@@ -1003,11 +1242,16 @@ if(currentScreen == SCREEN_SETTINGS_TITLE_MENU)
         switch(selectedTitleSource)
         {
             case TITLE_SOURCE_MOVIES:
+                fetchSeasonMovieChoices();
+                syncSelectedMovieChoices();
+                seasonMovieCursor = 0;
+                seasonMovieTop = 0;
                 currentScreen = SCREEN_SETTINGS_MOVIES_COMING;
                 okPress = false;
                 break;
 
             case TITLE_SOURCE_ANIME:
+                selectionMode = SELECTION_MODE_ANIME;
                 fetchSeasonAnimeChoices();
                 syncSelectedAnimeChoices();
                 seasonAnimeCursor = 0;
@@ -1026,13 +1270,52 @@ if(currentScreen == SCREEN_SETTINGS_TITLE_MENU)
 if(currentScreen == SCREEN_SETTINGS_MOVIES_COMING)
 {
     display.setFont(u8g2_font_5x7_tr);
-    display.drawStr(20, 26, "Movies");
-    display.drawStr(12, 42, "Coming Soon");
 
-    if(okPress)
+    if(leftPress && seasonMovieCount > 0)
     {
-        currentScreen = SCREEN_SETTINGS_TITLE_MENU;
+        if(seasonMovieCursor > 0)
+            seasonMovieCursor--;
+
+        if(seasonMovieCursor < seasonMovieTop)
+            seasonMovieTop--;
+    }
+
+    if(rightPress && seasonMovieCount > 0)
+    {
+        if(seasonMovieCursor < seasonMovieCount - 1)
+        {
+            seasonMovieCursor++;
+
+            if(seasonMovieCursor > seasonMovieTop + (VISIBLE_MOVIE_CHOICES - 1))
+                seasonMovieTop++;
+        }
+    }
+
+    if(okPress && seasonMovieCount > 0)
+    {
+        seasonMovieChoices[seasonMovieCursor].selected = !seasonMovieChoices[seasonMovieCursor].selected;
         okPress = false;
+    }
+
+    if(seasonMovieCount == 0)
+    {
+        display.drawStr(14, 36, "No movies this year");
+    }
+    else
+    {
+        for(int i = 0; i < VISIBLE_MOVIE_CHOICES; i++)
+        {
+            int index = seasonMovieTop + i;
+
+            if(index >= seasonMovieCount)
+                break;
+
+            int y = 18 + (i * 7);
+            display.drawStr(2, y, index == seasonMovieCursor ? ">" : " ");
+            display.drawStr(8, y, seasonMovieChoices[index].selected ? "*" : " ");
+            drawScrollingText(display, 14, y, 78, seasonMovieChoices[index].title, millis());
+            display.drawStr(94, y, trimDisplayText(seasonMovieChoices[index].date, 10).c_str());
+        }
     }
 }
 
@@ -1099,16 +1382,25 @@ if(currentScreen == SCREEN_SETTINGS_ANIME_ACTION_MENU)
         switch(selectedAnimeAction)
         {
             case ANIME_ACTION_DONE:
-                rebuildSelectedAnimeTitlesFromChoices();
-                saveSelectedAnimeTitles();
-                animeLoaded = false;
+                if(selectionMode == SELECTION_MODE_MOVIES)
+                {
+                    rebuildSelectedMovieTitlesFromChoices();
+                    saveSelectedMovieTitles();
+                    moviesLoaded = false;
+                }
+                else
+                {
+                    rebuildSelectedAnimeTitlesFromChoices();
+                    saveSelectedAnimeTitles();
+                    animeLoaded = false;
+                }
                 selectionDoneUntil = millis() + 700;
                 currentScreen = SCREEN_SETTINGS_DONE;
                 okPress = false;
                 break;
 
             case ANIME_ACTION_CANCEL:
-                currentScreen = SCREEN_HOME;
+                currentScreen = selectionMode == SELECTION_MODE_MOVIES ? SCREEN_SETTINGS_MOVIES_COMING : SCREEN_SETTINGS_ANIME_LIST;
                 okPress = false;
                 break;
         }

@@ -4,9 +4,35 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <time.h>
 
 
-Movie movies[3];
+Movie movies[MAX_MOVIES];
+int movieCount = 0;
+MovieChoice seasonMovieChoices[MAX_MOVIE_CHOICES];
+int seasonMovieCount = 0;
+String selectedMovieTitles[MAX_MOVIE_CHOICES];
+int selectedMovieTitleCount = 0;
+
+static int currentYearValue()
+{
+    time_t nowRaw = time(nullptr);
+    struct tm nowTime;
+    localtime_r(&nowRaw, &nowTime);
+    return nowTime.tm_year + 1900;
+}
+
+static bool isSelectedMovieTitle(const String &title)
+{
+    for(int i = 0; i < selectedMovieTitleCount; i++)
+    {
+        if(selectedMovieTitles[i] == title)
+            return true;
+    }
+
+    return false;
+}
+
 bool isFutureDate(String date)
 {
     if(date.length() < 10)
@@ -79,11 +105,18 @@ void fetchMovies()
     if(WiFi.status() != WL_CONNECTED)
         return;
 
+    String today = currentDate();
+    int currentYear = currentYearValue();
+    String startDate = today.length() >= 10 ? today : (String(currentYear) + "-01-01");
+    String endDate = String(currentYear) + "-12-31";
 
     String url =
-    "https://api.themoviedb.org/3/movie/upcoming?api_key="
+    "https://api.themoviedb.org/3/discover/movie?api_key="
     + String(TMDB_API_KEY)
-    + "&language=en-US&page=1";
+    + "&language=en-US&page=1"
+    + "&primary_release_date.gte=" + startDate
+    + "&primary_release_date.lte=" + endDate
+    + "&sort_by=popularity.desc";
 
 
     HTTPClient http;
@@ -111,35 +144,209 @@ void fetchMovies()
 
         JsonArray results = doc["results"];
 
+        struct MovieCandidate
+        {
+            String title;
+            String date;
+            int popularity;
+            bool selected;
+        };
 
-        int index = 0;
-
+        MovieCandidate candidates[20];
+        int candidateCount = 0;
 
         for(JsonObject item : results)
-{
-    String release =
-    item["release_date"].as<String>();
+        {
+            if(candidateCount >= 20)
+                break;
 
+            String release = item["release_date"].as<String>();
 
-    if(!isFutureDate(release))
-        continue;
+            if(!isFutureDate(release))
+                continue;
 
+            int releaseYear = release.substring(0, 4).toInt();
+            if(releaseYear != currentYear)
+                continue;
 
-    if(index >= 3)
-        break;
+            candidates[candidateCount].title = item["title"].as<String>();
+            candidates[candidateCount].date = formatDate(release);
+            candidates[candidateCount].popularity = item["popularity"].as<int>();
+            candidates[candidateCount].selected = isSelectedMovieTitle(candidates[candidateCount].title);
+            candidateCount++;
+        }
 
+        for(int i = 0; i < candidateCount - 1; i++)
+        {
+            for(int j = i + 1; j < candidateCount; j++)
+            {
+                if(candidates[j].popularity > candidates[i].popularity)
+                {
+                    MovieCandidate temp = candidates[i];
+                    candidates[i] = candidates[j];
+                    candidates[j] = temp;
+                }
+            }
+        }
 
-    movies[index].title = item["title"].as<String>();
+        movieCount = 0;
 
+        for(int i = 0; i < MAX_MOVIES; i++)
+        {
+            movies[i].title = "";
+            movies[i].date = "";
+            movies[i].popularity = 0;
+        }
 
-    movies[index].date =
-    formatDate(release);
+        int outputIndex = 0;
 
+        if(selectedMovieTitleCount > 0)
+        {
+            for(int i = 0; i < candidateCount; i++)
+            {
+                if(!candidates[i].selected)
+                    continue;
 
-    index++;
-}
+                movies[outputIndex].title = candidates[i].title;
+                movies[outputIndex].date = candidates[i].date;
+                movies[outputIndex].popularity = candidates[i].popularity;
+                movieCount++;
+                outputIndex++;
+                break;
+            }
+        }
+
+        for(int i = 0; i < candidateCount && outputIndex < MAX_MOVIES; i++)
+        {
+            if(outputIndex == 0)
+            {
+                movies[outputIndex].title = candidates[i].title;
+                movies[outputIndex].date = candidates[i].date;
+                movies[outputIndex].popularity = candidates[i].popularity;
+                movieCount++;
+                outputIndex++;
+                continue;
+            }
+
+            if(selectedMovieTitleCount > 0 && candidates[i].selected)
+                continue;
+
+            movies[outputIndex].title = candidates[i].title;
+            movies[outputIndex].date = candidates[i].date;
+            movies[outputIndex].popularity = candidates[i].popularity;
+            movieCount++;
+            outputIndex++;
+        }
     }
 
 
     http.end();
+}
+
+void fetchSeasonMovieChoices()
+{
+    if(WiFi.status() != WL_CONNECTED)
+        return;
+
+    seasonMovieCount = 0;
+    int currentYear = currentYearValue();
+    String today = currentDate();
+    String startDate = today.length() >= 10 ? today : (String(currentYear) + "-01-01");
+    String endDate = String(currentYear) + "-12-31";
+
+    const int maxPerMonth = 5;
+    MovieChoice monthTop[12][maxPerMonth];
+    int monthCount[12] = {0};
+
+    for(int page = 1; page <= 12; page++)
+    {
+        String url =
+        "https://api.themoviedb.org/3/discover/movie?api_key="
+        + String(TMDB_API_KEY)
+        + "&language=en-US&page=" + String(page)
+        + "&primary_release_date.gte=" + startDate
+        + "&primary_release_date.lte=" + endDate
+        + "&sort_by=popularity.desc";
+
+        HTTPClient http;
+        http.begin(url);
+
+        int code = http.GET();
+        if(code != 200)
+        {
+            http.end();
+            break;
+        }
+
+        String payload = http.getString();
+        JsonDocument doc;
+        if(deserializeJson(doc, payload))
+        {
+            http.end();
+            break;
+        }
+
+        JsonArray results = doc["results"];
+        if(results.size() == 0)
+        {
+            http.end();
+            break;
+        }
+
+        for(JsonObject item : results)
+        {
+            String release = item["release_date"].as<String>();
+
+            if(!isFutureDate(release))
+                continue;
+
+            int releaseYear = release.substring(0, 4).toInt();
+            if(releaseYear != currentYear)
+                continue;
+
+            int month = release.substring(5, 7).toInt();
+            if(month < 1 || month > 12)
+                continue;
+
+            int monthIndex = month - 1;
+            if(monthCount[monthIndex] >= maxPerMonth)
+                continue;
+
+            String title = item["title"].as<String>();
+            int movieId = item["id"].as<int>();
+            int popularity = item["popularity"].as<int>();
+            String prettyDate = formatDate(release);
+
+            bool duplicateInMonth = false;
+            for(int i = 0; i < monthCount[monthIndex]; i++)
+            {
+                if(monthTop[monthIndex][i].title == title)
+                {
+                    duplicateInMonth = true;
+                    break;
+                }
+            }
+
+            if(duplicateInMonth)
+                continue;
+
+            int writeIndex = monthCount[monthIndex];
+            monthTop[monthIndex][writeIndex].id = movieId;
+            monthTop[monthIndex][writeIndex].title = title;
+            monthTop[monthIndex][writeIndex].date = prettyDate;
+            monthTop[monthIndex][writeIndex].popularity = popularity;
+            monthTop[monthIndex][writeIndex].selected = isSelectedMovieTitle(title);
+            monthCount[monthIndex]++;
+        }
+
+        http.end();
+    }
+
+    for(int month = 0; month < 12 && seasonMovieCount < MAX_MOVIE_CHOICES; month++)
+    {
+        for(int i = 0; i < monthCount[month] && seasonMovieCount < MAX_MOVIE_CHOICES; i++)
+        {
+            seasonMovieChoices[seasonMovieCount++] = monthTop[month][i];
+        }
+    }
 }

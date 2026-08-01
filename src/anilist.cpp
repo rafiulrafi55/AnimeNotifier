@@ -39,7 +39,7 @@ static int currentSeasonYear()
 static bool isSelectedAnimeTitle(const String &title)
 {
     if(selectedAnimeTitleCount == 0)
-        return true;
+        return false;
 
     for(int i = 0; i < selectedAnimeTitleCount; i++)
     {
@@ -130,9 +130,19 @@ void fetchAnime()
     }
     )";
 
-    int index = 0;
+    struct AnimeRow
+    {
+        String title;
+        String time;
+        long airingAt;
+    };
 
-    for(int page = 1; page <= 20 && index < 3; page++)
+    AnimeRow selectedRow;
+    AnimeRow generalRows[2];
+    int generalCount = 0;
+    bool hasSelectedRow = false;
+
+    for(int page = 1; page <= 20; page++)
     {
         JsonDocument request;
         String pageQuery = query;
@@ -172,18 +182,33 @@ void fetchAnime()
 
         for (JsonObject item : results)
         {
-            if (index >= 3)
+            if(hasSelectedRow && generalCount >= 2)
                 break;
 
             String title = item["media"]["title"]["romaji"] | "Unknown Title";
+            long airing = item["airingAt"] | 0;
+            String timeLabel = formatAnimeTimeLabel(airing);
 
-            if(!isSelectedAnimeTitle(title))
+            if(isSelectedAnimeTitle(title))
+            {
+                if(!hasSelectedRow)
+                {
+                    selectedRow.title = title;
+                    selectedRow.time = timeLabel;
+                    selectedRow.airingAt = airing;
+                    hasSelectedRow = true;
+                }
+
                 continue;
+            }
 
             bool alreadyAdded = false;
-            for(int i = 0; i < index; i++)
+            if(hasSelectedRow && selectedRow.title == title)
+                alreadyAdded = true;
+
+            for(int i = 0; i < generalCount; i++)
             {
-                if(animeList[i].title == title)
+                if(generalRows[i].title == title)
                 {
                     alreadyAdded = true;
                     break;
@@ -193,25 +218,42 @@ void fetchAnime()
             if(alreadyAdded)
                 continue;
 
-            animeList[index].title = title;
-
-            long airing = item["airingAt"] | 0;
-
-            animeList[index].time = formatAnimeTimeLabel(airing);
-
-            Serial.printf("Index %d: Title=%s, Time=%s\n", index, animeList[index].title.c_str(), animeList[index].time.c_str());
-            index++;
+            if(generalCount < 2)
+            {
+                generalRows[generalCount].title = title;
+                generalRows[generalCount].time = timeLabel;
+                generalRows[generalCount].airingAt = airing;
+                generalCount++;
+            }
         }
 
         if(!pageInfo["hasNextPage"].as<bool>())
             break;
     }
 
-    while (index < 3)
+    for(int i = 0; i < 3; i++)
     {
-        animeList[index].title = "";
-        animeList[index].time = "";
-        index++;
+        animeList[i].title = "";
+        animeList[i].time = "";
+        animeList[i].airingAt = 0;
+    }
+
+    int outputIndex = 0;
+
+    if(hasSelectedRow)
+    {
+        animeList[0].title = selectedRow.title;
+        animeList[0].time = selectedRow.time;
+        animeList[0].airingAt = selectedRow.airingAt;
+        outputIndex = 1;
+    }
+
+    for(int i = 0; i < generalCount && outputIndex < 3; i++)
+    {
+        animeList[outputIndex].title = generalRows[i].title;
+        animeList[outputIndex].time = generalRows[i].time;
+        animeList[outputIndex].airingAt = generalRows[i].airingAt;
+        outputIndex++;
     }
 
     http.end();
@@ -252,7 +294,7 @@ void fetchSeasonAnimeChoices()
         )";
         seasonAnimeCount = 0;
 
-        for(int page = 1; page <= 50 && seasonAnimeCount < MAX_ANIME_CHOICES; page++)
+        for(int page = 1; page <= 100 && seasonAnimeCount < MAX_ANIME_CHOICES; page++)
         {
             JsonDocument request;
             String pageQuery = query;

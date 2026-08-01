@@ -20,10 +20,14 @@ void drawHeader(U8G2 &display, int batteryLevel, const char *ssid)
         display.drawBox(4, 5, fillWidth, 5);
     }
 
+    char batteryText[5];
+    snprintf(batteryText, sizeof(batteryText), "%d%%", batteryLevel);
+
+    display.setFont(u8g2_font_5x7_tr);
+    display.drawStr(26, 10, batteryText);
+
 
     // WiFi text
-    display.setFont(u8g2_font_5x7_tr);
-
     display.drawStr(70, 10, "WiFi:");
 
     if(ssid != nullptr && strlen(ssid) > 0)

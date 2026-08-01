@@ -3,12 +3,13 @@
 
 #include <Arduino.h>
 
-const int MAX_ANIME_CHOICES = 500;
+const int MAX_ANIME_CHOICES = 1000;
 
 struct Anime
 {
     String title;
     String time;
+    long airingAt;
 };
 
 struct AnimeChoice
