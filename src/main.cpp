@@ -35,7 +35,218 @@ const int RIGHT_LED_PWM_CHANNEL = 0;
 const int RIGHT_LED_PWM_FREQUENCY = 5000;
 const int RIGHT_LED_PWM_RESOLUTION = 8;
 
+const unsigned char WIFI_ICON_BITMAP[] PROGMEM = {
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x3F, 0xFC, 0x00,
+    0x01, 0xFF, 0xFF, 0x00,
+    0x07, 0xF8, 0x3F, 0xE0,
+    0x1F, 0x80, 0x03, 0xF0,
+    0x3E, 0x00, 0x00, 0x7C,
+    0x78, 0x00, 0x00, 0x3E,
+    0xF0, 0x0F, 0xF0, 0x0F,
+    0xE0, 0x7F, 0xFC, 0x07,
+    0x00, 0xFF, 0xFF, 0x00,
+    0x03, 0xF0, 0x0F, 0x80,
+    0x07, 0xC0, 0x03, 0xE0,
+    0x0F, 0x00, 0x00, 0xE0,
+    0x06, 0x03, 0xC0, 0x60,
+    0x00, 0x1F, 0xF8, 0x00,
+    0x00, 0x3F, 0xFC, 0x00,
+    0x00, 0x78, 0x1E, 0x00,
+    0x00, 0x60, 0x06, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x03, 0xC0, 0x00,
+    0x00, 0x07, 0xE0, 0x00,
+    0x00, 0x07, 0xE0, 0x00,
+    0x00, 0x07, 0xE0, 0x00,
+    0x00, 0x03, 0xC0, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+};
+
+const unsigned char SETTINGS_ICON_BITMAP[] PROGMEM = {
+    0x00, 0x03, 0xE0, 0x00,
+    0x00, 0x07, 0xF0, 0x00,
+    0x00, 0x07, 0xF0, 0x00,
+    0x03, 0x87, 0xF0, 0x40,
+    0x07, 0xDF, 0xF8, 0xE0,
+    0x0F, 0xFF, 0xFF, 0xF0,
+    0x1F, 0xFF, 0xFF, 0xF8,
+    0x0F, 0xFF, 0xFF, 0xF8,
+    0x07, 0xFF, 0xFF, 0xF8,
+    0x07, 0xFF, 0xFF, 0xF0,
+    0x07, 0xF8, 0x1F, 0xE0,
+    0x0F, 0xE0, 0x07, 0xF0,
+    0x7F, 0xE0, 0x07, 0xF0,
+    0xFF, 0xC0, 0x03, 0xFE,
+    0xFF, 0xC0, 0x03, 0xFF,
+    0xFF, 0xC0, 0x03, 0xFF,
+    0xFF, 0xC0, 0x03, 0xFF,
+    0xFF, 0xC0, 0x03, 0xFF,
+    0x7F, 0xC0, 0x03, 0xFF,
+    0x0F, 0xE0, 0x07, 0xFE,
+    0x0F, 0xE0, 0x07, 0xF0,
+    0x07, 0xF8, 0x1F, 0xE0,
+    0x0F, 0xFF, 0xFF, 0xE0,
+    0x1F, 0xFF, 0xFF, 0xE0,
+    0x1F, 0xFF, 0xFF, 0xF0,
+    0x1F, 0xFF, 0xFF, 0xF8,
+    0x0F, 0xFF, 0xFF, 0xF0,
+    0x07, 0x1F, 0xFB, 0xE0,
+    0x02, 0x0F, 0xE1, 0xC0,
+    0x00, 0x0F, 0xE0, 0x00,
+    0x00, 0x0F, 0xE0, 0x00,
+    0x00, 0x07, 0xC0, 0x00,
+};
+
+const unsigned char ABOUT_ICON_BITMAP[] PROGMEM = {
+    0x00, 0x0F, 0xF0, 0x00,
+    0x00, 0x7F, 0xFE, 0x00,
+    0x01, 0xFF, 0xFF, 0x80,
+    0x03, 0xFF, 0xFF, 0xC0,
+    0x07, 0xFF, 0xFF, 0xE0,
+    0x0F, 0xFF, 0xFF, 0xF0,
+    0x1F, 0xFC, 0x1F, 0xF8,
+    0x3F, 0xF8, 0x1F, 0xFC,
+    0x3F, 0xF8, 0x1F, 0xFC,
+    0x7F, 0xF8, 0x3F, 0xFE,
+    0x7F, 0xFC, 0x7F, 0xFE,
+    0x7F, 0xFF, 0xFF, 0xFE,
+    0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xE0, 0x1F, 0xFF,
+    0xFF, 0xF8, 0x1F, 0xFF,
+    0xFF, 0xF8, 0x1F, 0xFF,
+    0xFF, 0xF8, 0x1F, 0xFF,
+    0xFF, 0xF8, 0x1F, 0xFF,
+    0xFF, 0xF8, 0x1F, 0xFF,
+    0xFF, 0xF8, 0x1F, 0xFF,
+    0x7F, 0xF8, 0x1F, 0xFE,
+    0x7F, 0xF8, 0x1F, 0xFE,
+    0x7F, 0xF8, 0x1F, 0xFE,
+    0x3F, 0xF8, 0x1F, 0xFC,
+    0x3F, 0xE0, 0x07, 0xFC,
+    0x1F, 0xF0, 0x0F, 0xF8,
+    0x0F, 0xFF, 0xFF, 0xF0,
+    0x07, 0xFF, 0xFF, 0xE0,
+    0x03, 0xFF, 0xFF, 0xC0,
+    0x01, 0xFF, 0xFF, 0x80,
+    0x00, 0x7F, 0xFE, 0x00,
+    0x00, 0x0F, 0xF0, 0x00,
+};
+
+const unsigned char LIST_ICON_BITMAP[] PROGMEM = {
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x30, 0x00, 0x00, 0x00,
+    0x79, 0xFF, 0xFF, 0xFC,
+    0x7B, 0xFF, 0xFF, 0xFE,
+    0x79, 0xFF, 0xFF, 0xFC,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x78, 0x00, 0x00, 0x00,
+    0x7B, 0xFF, 0xFF, 0xFE,
+    0x79, 0xFF, 0xFF, 0xFC,
+    0x38, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x38, 0x00, 0x00, 0x00,
+    0x79, 0xFF, 0xFF, 0xFC,
+    0x7B, 0xFF, 0xFF, 0xFE,
+    0x78, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x79, 0xFF, 0xFF, 0xFC,
+    0x7B, 0xFF, 0xFF, 0xFE,
+    0x79, 0xFF, 0xFF, 0xFC,
+    0x30, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+};
+
+const unsigned char REBOOT_ICON_BITMAP[] PROGMEM = {
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x07, 0xE1, 0x00,
+    0x00, 0x3F, 0xFF, 0x80,
+    0x00, 0xFF, 0xFF, 0x80,
+    0x01, 0xF0, 0x1F, 0xC0,
+    0x03, 0xC0, 0x07, 0xC0,
+    0x07, 0x80, 0x0F, 0xE0,
+    0x07, 0x00, 0x00, 0x00,
+    0x0E, 0x00, 0x00, 0x00,
+    0x0E, 0x00, 0x00, 0x00,
+    0x0C, 0x00, 0x00, 0x00,
+    0x1C, 0x00, 0x00, 0x00,
+    0x1C, 0x00, 0x00, 0x00,
+    0x1C, 0x00, 0x00, 0x00,
+    0x1C, 0x00, 0x00, 0x18,
+    0x1C, 0x00, 0x00, 0x18,
+    0x1C, 0x00, 0x00, 0x30,
+    0x0C, 0x00, 0x00, 0x30,
+    0x0E, 0x00, 0x00, 0x30,
+    0x0E, 0x00, 0x00, 0x60,
+    0x07, 0x00, 0x00, 0xE0,
+    0x07, 0x80, 0x00, 0xC0,
+    0x03, 0xC0, 0x03, 0xC0,
+    0x01, 0xE0, 0x07, 0x80,
+    0x00, 0xFC, 0x3E, 0x00,
+    0x00, 0x3F, 0xFC, 0x00,
+    0x00, 0x07, 0xE0, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+};
+
+const unsigned char BATTERY_ICON_BITMAP[] PROGMEM = {
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x1F, 0xFF, 0xFF, 0xF0,
+    0x3F, 0xFF, 0xFF, 0xF0,
+    0x3F, 0xFF, 0xFF, 0xF8,
+    0x3F, 0xFF, 0xFF, 0xF8,
+    0x3F, 0xFF, 0xFF, 0xF8,
+    0x3F, 0xFF, 0xFF, 0xFE,
+    0x3F, 0xFF, 0xFF, 0xFE,
+    0x3F, 0xFF, 0xFF, 0xFE,
+    0x3F, 0xFF, 0xFF, 0xFE,
+    0x3F, 0xFF, 0xFF, 0xFE,
+    0x3F, 0xFF, 0xFF, 0xFE,
+    0x3F, 0xFF, 0xFF, 0xF8,
+    0x3F, 0xFF, 0xFF, 0xF8,
+    0x3F, 0xFF, 0xFF, 0xF8,
+    0x3F, 0xFF, 0xFF, 0xF0,
+    0x1F, 0xFF, 0xFF, 0xF0,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+};
+
 const unsigned long UPDATE_INTERVAL = 900000; 
+const unsigned long LOAD_RETRY_INTERVAL = 15000;
 // 15 minutes
 
 enum Screen
@@ -51,11 +262,14 @@ enum Screen
     SCREEN_WIFI_CONNECTING,
 
     SCREEN_SETTINGS,
+    SCREEN_SETTINGS_EMPTY,
     SCREEN_SETTINGS_TITLE_MENU,
     SCREEN_SETTINGS_MOVIES_COMING,
     SCREEN_SETTINGS_ANIME_LIST,
     SCREEN_SETTINGS_ANIME_ACTION_MENU,
     SCREEN_SETTINGS_DONE,
+    SCREEN_REBOOT_CONFIRM,
+    SCREEN_BATTERY_INFO,
     SCREEN_ABOUT
 };
 
@@ -63,7 +277,16 @@ enum MainMenuItem
 {
     MAIN_MENU_WIFI,
     MAIN_MENU_SETTINGS,
-    MAIN_MENU_ABOUT
+    MAIN_MENU_LIST,
+    MAIN_MENU_BATTERY,
+    MAIN_MENU_ABOUT,
+    MAIN_MENU_REBOOT
+};
+
+enum RebootConfirmItem
+{
+    REBOOT_CONFIRM_NO,
+    REBOOT_CONFIRM_YES
 };
 
 enum SettingsMenuItem
@@ -71,6 +294,15 @@ enum SettingsMenuItem
     SETTINGS_DEFAULT,
     SETTINGS_SELECT_TITLE
 };
+
+enum DeviceSettingsItem
+{
+    DEVICE_SETTING_BRIGHTNESS,
+    DEVICE_SETTING_LED,
+    DEVICE_SETTING_BUZZER
+};
+
+const int DEVICE_SETTINGS_COUNT = 3;
 
 enum TitleSourceItem
 {
@@ -96,6 +328,8 @@ SettingsMenuItem selectedSettingsMenu = SETTINGS_DEFAULT;
 TitleSourceItem selectedTitleSource = TITLE_SOURCE_MOVIES;
 AnimeActionItem selectedAnimeAction = ANIME_ACTION_DONE;
 SelectionMode selectionMode = SELECTION_MODE_ANIME;
+RebootConfirmItem rebootConfirmItem = REBOOT_CONFIRM_NO;
+DeviceSettingsItem selectedDeviceSetting = DEVICE_SETTING_BRIGHTNESS;
 
 enum WifiMenuItem
 {
@@ -149,6 +383,12 @@ enum KeyboardMode
 };
 
 KeyboardMode keyboardMode = MODE_LOWER;
+
+int brightnessLevelIndex = 2;
+bool ledAlertsEnabled = true;
+bool buzzerAlertsEnabled = true;
+const uint8_t BRIGHTNESS_LEVELS[] = {64, 128, 192, 255};
+const int BRIGHTNESS_LEVEL_COUNT = sizeof(BRIGHTNESS_LEVELS) / sizeof(BRIGHTNESS_LEVELS[0]);
 
 AnimeChoice seasonAnimeChoices[MAX_ANIME_CHOICES];
 int seasonAnimeCount = 0;
@@ -330,6 +570,55 @@ void rebuildSelectedMovieTitlesFromChoices()
     }
 }
 
+void saveUiSettings()
+{
+    prefs.begin("settings", false);
+    prefs.putInt("brightness", brightnessLevelIndex);
+    prefs.putBool("led", ledAlertsEnabled);
+    prefs.putBool("buzzer", buzzerAlertsEnabled);
+    prefs.end();
+}
+
+void applyDisplayBrightness()
+{
+    if(brightnessLevelIndex < 0)
+        brightnessLevelIndex = 0;
+
+    if(brightnessLevelIndex >= BRIGHTNESS_LEVEL_COUNT)
+        brightnessLevelIndex = BRIGHTNESS_LEVEL_COUNT - 1;
+
+    display.setContrast(BRIGHTNESS_LEVELS[brightnessLevelIndex]);
+}
+
+void loadUiSettings()
+{
+    prefs.begin("settings", true);
+    brightnessLevelIndex = prefs.getInt("brightness", brightnessLevelIndex);
+    ledAlertsEnabled = prefs.getBool("led", true);
+    buzzerAlertsEnabled = prefs.getBool("buzzer", true);
+    prefs.end();
+
+    if(brightnessLevelIndex < 0)
+        brightnessLevelIndex = 0;
+
+    if(brightnessLevelIndex >= BRIGHTNESS_LEVEL_COUNT)
+        brightnessLevelIndex = BRIGHTNESS_LEVEL_COUNT - 1;
+}
+
+String currentTimeLabel()
+{
+    if(!timeReady())
+        return "--:--";
+
+    time_t nowRaw = time(nullptr);
+    struct tm nowTime;
+    localtime_r(&nowRaw, &nowTime);
+
+    char buffer[6];
+    snprintf(buffer, sizeof(buffer), "%02d:%02d", nowTime.tm_hour, nowTime.tm_min);
+    return String(buffer);
+}
+
 String trimDisplayText(const String &text, size_t maxChars)
 {
     if (text.length() <= maxChars)
@@ -363,6 +652,31 @@ void setRightLedBrightness(uint8_t duty)
     ledcWrite(RIGHT_LED_PWM_CHANNEL, duty);
 }
 
+void drawBatteryStatusIcon(U8G2 &oled, int x, int y, int width, int height, int batteryLevel)
+{
+    if(batteryLevel < 0)
+        batteryLevel = 0;
+
+    if(batteryLevel > 100)
+        batteryLevel = 100;
+
+    const int tipWidth = width / 8;
+    const int bodyWidth = width - tipWidth - 1;
+    const int tipHeight = height / 2;
+    const int tipY = y + ((height - tipHeight) / 2);
+    const int innerPadding = 2;
+
+    oled.drawFrame(x, y, bodyWidth, height);
+    oled.drawBox(x + bodyWidth, tipY, tipWidth, tipHeight);
+
+    int innerWidth = bodyWidth - (innerPadding * 2);
+    int innerHeight = height - (innerPadding * 2);
+    int fillWidth = map(batteryLevel, 0, 100, 0, innerWidth);
+
+    if(fillWidth > 0 && innerHeight > 0)
+        oled.drawBox(x + innerPadding, y + innerPadding, fillWidth, innerHeight);
+}
+
 void updateAlertOutputs(int batteryLevel)
 {
     if(batteryLevel < 0)
@@ -371,7 +685,7 @@ void updateAlertOutputs(int batteryLevel)
     if(batteryLevel > 100)
         batteryLevel = 100;
 
-    bool leftLedOn = batteryLevel < 20 && ((millis() / 500) % 2 == 0);
+    bool leftLedOn = ledAlertsEnabled && batteryLevel < 20 && ((millis() / 500) % 2 == 0);
 
     bool shouldBeep = false;
 
@@ -380,7 +694,7 @@ void updateAlertOutputs(int batteryLevel)
         time_t now = time(nullptr);
         time_t airingAt = selectedAnimeAlertAiringAt;
 
-        if(now < airingAt && isSameLocalDay(now, airingAt))
+        if(ledAlertsEnabled && now < airingAt && isSameLocalDay(now, airingAt))
         {
             const unsigned long pulseMs = 3000;
             const unsigned long gapMs = 60000;
@@ -413,7 +727,7 @@ void updateAlertOutputs(int batteryLevel)
             shouldBeep = true;
     }
 
-    if(shouldBeep)
+    if(shouldBeep && buzzerAlertsEnabled)
     {
         const unsigned long beepInterval = 350;
 
@@ -438,7 +752,10 @@ void updateAlertOutputs(int batteryLevel)
 
     digitalWrite(LEFT_LED_PIN, leftLedOn ? HIGH : LOW);
 
-    if(!(timeReady() && selectedAnimeAlertAiringAt > 0 && isSameLocalDay(time(nullptr), selectedAnimeAlertAiringAt) && time(nullptr) < selectedAnimeAlertAiringAt))
+    if(!ledAlertsEnabled)
+        setRightLedBrightness(0);
+
+    if(!ledAlertsEnabled || !(timeReady() && selectedAnimeAlertAiringAt > 0 && isSameLocalDay(time(nullptr), selectedAnimeAlertAiringAt) && time(nullptr) < selectedAnimeAlertAiringAt))
         setRightLedBrightness(0);
 }
 
@@ -464,6 +781,438 @@ void drawScrollingText(U8G2 &oled, int x, int y, int width, const String &text, 
     oled.setClipWindow(x, y - 6, x + width - 1, y + 1);
     oled.drawStr(drawX, y, text.c_str());
     oled.setClipWindow(0, 0, 127, 63);
+}
+
+void drawWifiMenuIcon(U8G2 &oled)
+{
+    const int bitmapWidth = 32;
+    const int bitmapHeight = 32;
+
+    int minX = bitmapWidth;
+    int minY = bitmapHeight;
+    int maxX = -1;
+    int maxY = -1;
+
+    for(int y = 0; y < bitmapHeight; y++)
+    {
+        for(int x = 0; x < bitmapWidth; x++)
+        {
+            int byteIndex = y * (bitmapWidth / 8) + (x / 8);
+            uint8_t value = WIFI_ICON_BITMAP[byteIndex];
+
+            if((value >> (7 - (x % 8))) & 0x01)
+            {
+                if(x < minX) minX = x;
+                if(y < minY) minY = y;
+                if(x > maxX) maxX = x;
+                if(y > maxY) maxY = y;
+            }
+        }
+    }
+
+    if(maxX < minX || maxY < minY)
+        return;
+
+    int glyphWidth = maxX - minX + 1;
+    int glyphHeight = maxY - minY + 1;
+
+    const int targetWidth = 84;
+    const int targetHeight = 42;
+
+    int scaleX = targetWidth / glyphWidth;
+    int scaleY = targetHeight / glyphHeight;
+    int scale = scaleX < scaleY ? scaleX : scaleY;
+
+    if(scale < 1)
+        scale = 1;
+    if(scale > 2)
+        scale = 2;
+
+    int drawWidth = glyphWidth * scale;
+    int drawHeight = glyphHeight * scale;
+
+    int startX = 64 - (drawWidth / 2);
+    int startY = 36 - (drawHeight / 2);
+
+    for(int y = minY; y <= maxY; y++)
+    {
+        for(int x = minX; x <= maxX; x++)
+        {
+            int byteIndex = y * (bitmapWidth / 8) + (x / 8);
+            uint8_t value = WIFI_ICON_BITMAP[byteIndex];
+
+            if((value >> (7 - (x % 8))) & 0x01)
+            {
+                int px = startX + (x - minX) * scale;
+                int py = startY + (y - minY) * scale;
+
+                if(scale == 1)
+                    oled.drawPixel(px, py);
+                else
+                    oled.drawBox(px, py, scale, scale);
+            }
+        }
+    }
+}
+
+void drawSettingsMenuIcon(U8G2 &oled)
+{
+    const int bitmapWidth = 32;
+    const int bitmapHeight = 32;
+
+    int minX = bitmapWidth;
+    int minY = bitmapHeight;
+    int maxX = -1;
+    int maxY = -1;
+
+    for(int y = 0; y < bitmapHeight; y++)
+    {
+        for(int x = 0; x < bitmapWidth; x++)
+        {
+            int byteIndex = y * (bitmapWidth / 8) + (x / 8);
+            uint8_t value = SETTINGS_ICON_BITMAP[byteIndex];
+
+            if((value >> (7 - (x % 8))) & 0x01)
+            {
+                if(x < minX) minX = x;
+                if(y < minY) minY = y;
+                if(x > maxX) maxX = x;
+                if(y > maxY) maxY = y;
+            }
+        }
+    }
+
+    if(maxX < minX || maxY < minY)
+        return;
+
+    int glyphWidth = maxX - minX + 1;
+    int glyphHeight = maxY - minY + 1;
+
+    const int targetWidth = 84;
+    const int targetHeight = 42;
+
+    int scaleX = targetWidth / glyphWidth;
+    int scaleY = targetHeight / glyphHeight;
+    int scale = scaleX < scaleY ? scaleX : scaleY;
+
+    if(scale < 1)
+        scale = 1;
+    if(scale > 2)
+        scale = 2;
+
+    int drawWidth = glyphWidth * scale;
+    int drawHeight = glyphHeight * scale;
+
+    int startX = 64 - (drawWidth / 2);
+    int startY = 36 - (drawHeight / 2);
+
+    for(int y = minY; y <= maxY; y++)
+    {
+        for(int x = minX; x <= maxX; x++)
+        {
+            int byteIndex = y * (bitmapWidth / 8) + (x / 8);
+            uint8_t value = SETTINGS_ICON_BITMAP[byteIndex];
+
+            if((value >> (7 - (x % 8))) & 0x01)
+            {
+                int px = startX + (x - minX) * scale;
+                int py = startY + (y - minY) * scale;
+
+                if(scale == 1)
+                    oled.drawPixel(px, py);
+                else
+                    oled.drawBox(px, py, scale, scale);
+            }
+        }
+    }
+}
+
+void drawAboutMenuIcon(U8G2 &oled)
+{
+    const int bitmapWidth = 32;
+    const int bitmapHeight = 32;
+
+    int minX = bitmapWidth;
+    int minY = bitmapHeight;
+    int maxX = -1;
+    int maxY = -1;
+
+    for(int y = 0; y < bitmapHeight; y++)
+    {
+        for(int x = 0; x < bitmapWidth; x++)
+        {
+            int byteIndex = y * (bitmapWidth / 8) + (x / 8);
+            uint8_t value = ABOUT_ICON_BITMAP[byteIndex];
+
+            if((value >> (7 - (x % 8))) & 0x01)
+            {
+                if(x < minX) minX = x;
+                if(y < minY) minY = y;
+                if(x > maxX) maxX = x;
+                if(y > maxY) maxY = y;
+            }
+        }
+    }
+
+    if(maxX < minX || maxY < minY)
+        return;
+
+    int glyphWidth = maxX - minX + 1;
+    int glyphHeight = maxY - minY + 1;
+
+    const int targetWidth = 84;
+    const int targetHeight = 42;
+
+    int scaleX = targetWidth / glyphWidth;
+    int scaleY = targetHeight / glyphHeight;
+    int scale = scaleX < scaleY ? scaleX : scaleY;
+
+    if(scale < 1)
+        scale = 1;
+    if(scale > 2)
+        scale = 2;
+
+    int drawWidth = glyphWidth * scale;
+    int drawHeight = glyphHeight * scale;
+
+    int startX = 64 - (drawWidth / 2);
+    int startY = 36 - (drawHeight / 2);
+
+    for(int y = minY; y <= maxY; y++)
+    {
+        for(int x = minX; x <= maxX; x++)
+        {
+            int byteIndex = y * (bitmapWidth / 8) + (x / 8);
+            uint8_t value = ABOUT_ICON_BITMAP[byteIndex];
+
+            if((value >> (7 - (x % 8))) & 0x01)
+            {
+                int px = startX + (x - minX) * scale;
+                int py = startY + (y - minY) * scale;
+
+                if(scale == 1)
+                    oled.drawPixel(px, py);
+                else
+                    oled.drawBox(px, py, scale, scale);
+            }
+        }
+    }
+}
+
+void drawListMenuIcon(U8G2 &oled)
+{
+    const int bitmapWidth = 32;
+    const int bitmapHeight = 32;
+
+    int minX = bitmapWidth;
+    int minY = bitmapHeight;
+    int maxX = -1;
+    int maxY = -1;
+
+    for(int y = 0; y < bitmapHeight; y++)
+    {
+        for(int x = 0; x < bitmapWidth; x++)
+        {
+            int byteIndex = y * (bitmapWidth / 8) + (x / 8);
+            uint8_t value = LIST_ICON_BITMAP[byteIndex];
+
+            if((value >> (7 - (x % 8))) & 0x01)
+            {
+                if(x < minX) minX = x;
+                if(y < minY) minY = y;
+                if(x > maxX) maxX = x;
+                if(y > maxY) maxY = y;
+            }
+        }
+    }
+
+    if(maxX < minX || maxY < minY)
+        return;
+
+    int glyphWidth = maxX - minX + 1;
+    int glyphHeight = maxY - minY + 1;
+
+    const int targetWidth = 84;
+    const int targetHeight = 42;
+
+    int scaleX = targetWidth / glyphWidth;
+    int scaleY = targetHeight / glyphHeight;
+    int scale = scaleX < scaleY ? scaleX : scaleY;
+
+    if(scale < 1)
+        scale = 1;
+    if(scale > 2)
+        scale = 2;
+
+    int drawWidth = glyphWidth * scale;
+    int drawHeight = glyphHeight * scale;
+
+    int startX = 64 - (drawWidth / 2);
+    int startY = 36 - (drawHeight / 2);
+
+    for(int y = minY; y <= maxY; y++)
+    {
+        for(int x = minX; x <= maxX; x++)
+        {
+            int byteIndex = y * (bitmapWidth / 8) + (x / 8);
+            uint8_t value = LIST_ICON_BITMAP[byteIndex];
+
+            if((value >> (7 - (x % 8))) & 0x01)
+            {
+                int px = startX + (x - minX) * scale;
+                int py = startY + (y - minY) * scale;
+
+                if(scale == 1)
+                    oled.drawPixel(px, py);
+                else
+                    oled.drawBox(px, py, scale, scale);
+            }
+        }
+    }
+}
+
+void drawRebootMenuIcon(U8G2 &oled)
+{
+    const int bitmapWidth = 32;
+    const int bitmapHeight = 32;
+
+    int minX = bitmapWidth;
+    int minY = bitmapHeight;
+    int maxX = -1;
+    int maxY = -1;
+
+    for(int y = 0; y < bitmapHeight; y++)
+    {
+        for(int x = 0; x < bitmapWidth; x++)
+        {
+            int byteIndex = y * (bitmapWidth / 8) + (x / 8);
+            uint8_t value = REBOOT_ICON_BITMAP[byteIndex];
+
+            if((value >> (7 - (x % 8))) & 0x01)
+            {
+                if(x < minX) minX = x;
+                if(y < minY) minY = y;
+                if(x > maxX) maxX = x;
+                if(y > maxY) maxY = y;
+            }
+        }
+    }
+
+    if(maxX < minX || maxY < minY)
+        return;
+
+    int glyphWidth = maxX - minX + 1;
+    int glyphHeight = maxY - minY + 1;
+
+    const int targetWidth = 84;
+    const int targetHeight = 42;
+
+    int scaleX = targetWidth / glyphWidth;
+    int scaleY = targetHeight / glyphHeight;
+    int scale = scaleX < scaleY ? scaleX : scaleY;
+
+    if(scale < 1)
+        scale = 1;
+    if(scale > 2)
+        scale = 2;
+
+    int drawWidth = glyphWidth * scale;
+    int drawHeight = glyphHeight * scale;
+
+    int startX = 64 - (drawWidth / 2);
+    int startY = 36 - (drawHeight / 2);
+
+    for(int y = minY; y <= maxY; y++)
+    {
+        for(int x = minX; x <= maxX; x++)
+        {
+            int byteIndex = y * (bitmapWidth / 8) + (x / 8);
+            uint8_t value = REBOOT_ICON_BITMAP[byteIndex];
+
+            if((value >> (7 - (x % 8))) & 0x01)
+            {
+                int px = startX + (x - minX) * scale;
+                int py = startY + (y - minY) * scale;
+
+                if(scale == 1)
+                    oled.drawPixel(px, py);
+                else
+                    oled.drawBox(px, py, scale, scale);
+            }
+        }
+    }
+}
+
+void drawBatteryMenuIcon(U8G2 &oled)
+{
+    const int bitmapWidth = 32;
+    const int bitmapHeight = 32;
+
+    int minX = bitmapWidth;
+    int minY = bitmapHeight;
+    int maxX = -1;
+    int maxY = -1;
+
+    for(int y = 0; y < bitmapHeight; y++)
+    {
+        for(int x = 0; x < bitmapWidth; x++)
+        {
+            int byteIndex = y * (bitmapWidth / 8) + (x / 8);
+            uint8_t value = BATTERY_ICON_BITMAP[byteIndex];
+
+            if((value >> (7 - (x % 8))) & 0x01)
+            {
+                if(x < minX) minX = x;
+                if(y < minY) minY = y;
+                if(x > maxX) maxX = x;
+                if(y > maxY) maxY = y;
+            }
+        }
+    }
+
+    if(maxX < minX || maxY < minY)
+        return;
+
+    int glyphWidth = maxX - minX + 1;
+    int glyphHeight = maxY - minY + 1;
+
+    const int targetWidth = 48;
+    const int targetHeight = 24;
+
+    int scaleX = targetWidth / glyphWidth;
+    int scaleY = targetHeight / glyphHeight;
+    int scale = scaleX < scaleY ? scaleX : scaleY;
+
+    if(scale < 1)
+        scale = 1;
+    if(scale > 1)
+        scale = 1;
+
+    int drawWidth = glyphWidth * scale;
+    int drawHeight = glyphHeight * scale;
+
+    int startX = 64 - (drawWidth / 2);
+    int startY = 36 - (drawHeight / 2);
+
+    for(int y = minY; y <= maxY; y++)
+    {
+        for(int x = minX; x <= maxX; x++)
+        {
+            int byteIndex = y * (bitmapWidth / 8) + (x / 8);
+            uint8_t value = BATTERY_ICON_BITMAP[byteIndex];
+
+            if((value >> (7 - (x % 8))) & 0x01)
+            {
+                int px = startX + (x - minX) * scale;
+                int py = startY + (y - minY) * scale;
+
+                if(scale == 1)
+                    oled.drawPixel(px, py);
+                else
+                    oled.drawBox(px, py, scale, scale);
+            }
+        }
+    }
 }
 
 const char* getCurrentCharset()
@@ -514,7 +1263,8 @@ void nextKeyboardMode()
 void scanNetworks()
 {
     display.clearBuffer();
-    drawHeader(display, batteryPercent(), "");
+    String headerTime = currentTimeLabel();
+    drawHeader(display, batteryPercent(), headerTime.c_str(), "");
 
     display.setFont(u8g2_font_5x7_tr);
     display.drawStr(20, 30, "Scanning...");
@@ -547,6 +1297,9 @@ void setup()
     setRightLedBrightness(0);
 
     displayInit();
+
+    loadUiSettings();
+    applyDisplayBrightness();
 
     batteryInit();
 
@@ -609,7 +1362,8 @@ void loop()
     currentSSID = WiFi.SSID();
 }
 
-    drawHeader(display, batteryLevel, currentSSID.c_str());
+    String headerTime = currentTimeLabel();
+    drawHeader(display, batteryLevel, headerTime.c_str(), currentSSID.c_str());
 
     if(currentScreen == SCREEN_HOME && (leftPress || rightPress))
         silenceSelectedAnimeAlert();
@@ -635,34 +1389,41 @@ void loop()
 
         unsigned long now = millis();
 
-        if(now - movieUpdateTimer > UPDATE_INTERVAL || !moviesLoaded)
+        unsigned long movieInterval = moviesLoaded ? UPDATE_INTERVAL : LOAD_RETRY_INTERVAL;
+        if(now - movieUpdateTimer > movieInterval)
         {
-            fetchMovies();
+            bool movieFetchOk = fetchMovies();
             movieUpdateTimer = now;
-            moviesLoaded = true;
+
+            if(movieFetchOk)
+                moviesLoaded = true;
         }
 
-        if(now - animeUpdateTimer > UPDATE_INTERVAL || !animeLoaded)
+        unsigned long animeInterval = animeLoaded ? UPDATE_INTERVAL : LOAD_RETRY_INTERVAL;
+        if(now - animeUpdateTimer > animeInterval)
         {
             long previousSelectedAnimeAlertAiringAt = selectedAnimeAlertAiringAt;
 
-            fetchAnime();
+            bool animeFetchOk = fetchAnime();
 
-            if(selectedAnimeTitleCount > 0 && animeTitleIsSelected(animeList[0].title))
-                selectedAnimeAlertAiringAt = animeList[0].airingAt;
-            else
-                selectedAnimeAlertAiringAt = 0;
-
-            if(selectedAnimeAlertAiringAt != previousSelectedAnimeAlertAiringAt)
+            if(animeFetchOk)
             {
-                selectedAnimeAlertMutedAiringAt = 0;
-                selectedAnimeAlertBeepOn = false;
-                digitalWrite(BUZZER_PIN, LOW);
+                if(selectedAnimeTitleCount > 0 && animeTitleIsSelected(animeList[0].title))
+                    selectedAnimeAlertAiringAt = animeList[0].airingAt;
+                else
+                    selectedAnimeAlertAiringAt = 0;
+
+                if(selectedAnimeAlertAiringAt != previousSelectedAnimeAlertAiringAt)
+                {
+                    selectedAnimeAlertMutedAiringAt = 0;
+                    selectedAnimeAlertBeepOn = false;
+                    digitalWrite(BUZZER_PIN, LOW);
+                }
+
+                animeLoaded = true;
             }
 
             animeUpdateTimer = now;
-
-            animeLoaded = true;
 
             delay(500);
         }
@@ -718,6 +1479,18 @@ void loop()
                 currentScreen = SCREEN_HOME;
                 break;
 
+            case SCREEN_SETTINGS_EMPTY:
+                currentScreen = SCREEN_MENU;
+                break;
+
+            case SCREEN_REBOOT_CONFIRM:
+                currentScreen = SCREEN_MENU;
+                break;
+
+            case SCREEN_BATTERY_INFO:
+                currentScreen = SCREEN_MENU;
+                break;
+
             default:
                 currentScreen = SCREEN_MENU;
                 break;
@@ -756,31 +1529,38 @@ if(currentScreen == SCREEN_HOME)
     }
     else
     {
-        for(int i=0;i<3;i++)
+        if(!moviesLoaded || !animeLoaded)
         {
-            int y = 20 + i*14;
+            display.drawStr(42, 34, "Loading...");
+        }
+        else
+        {
+            for(int i=0;i<3;i++)
+            {
+                int y = 20 + i*14;
 
 
-            // Anime left
-            drawScrollingText(display, animeX, y, titleWidth, animeList[i].title, scrollNow);
+                // Anime left
+                drawScrollingText(display, animeX, y, titleWidth, animeList[i].title, scrollNow);
 
-            display.drawStr(
-                animeX,
-                y+6,
-                trimDisplayText(animeList[i].time, 12).c_str()
-            );
-
-
-            // Movie title
-            drawScrollingText(display, movieX, y, titleWidth, movies[i].title, scrollNow);
+                display.drawStr(
+                    animeX,
+                    y+6,
+                    trimDisplayText(animeList[i].time, 12).c_str()
+                );
 
 
-            // Date
-            display.drawStr(
-                movieX,
-                y+6,
-                trimDisplayText(movies[i].date, 12).c_str()
-            );
+                // Movie title
+                drawScrollingText(display, movieX, y, titleWidth, movies[i].title, scrollNow);
+
+
+                // Date
+                display.drawStr(
+                    movieX,
+                    y+6,
+                    trimDisplayText(movies[i].date, 12).c_str()
+                );
+            }
         }
     }
 }
@@ -792,14 +1572,14 @@ if(currentScreen == SCREEN_HOME)
     if(leftPress)
     {
         if(selectedMenu == MAIN_MENU_WIFI)
-            selectedMenu = MAIN_MENU_ABOUT;
+            selectedMenu = MAIN_MENU_REBOOT;
         else
             selectedMenu = (MainMenuItem)(selectedMenu - 1);
     }
 
     if(rightPress)
     {
-        if(selectedMenu == MAIN_MENU_ABOUT)
+        if(selectedMenu == MAIN_MENU_REBOOT)
             selectedMenu = MAIN_MENU_WIFI;
         else
             selectedMenu = (MainMenuItem)(selectedMenu + 1);
@@ -816,8 +1596,8 @@ if(currentScreen == SCREEN_HOME)
                 break;
 
             case MAIN_MENU_SETTINGS:
-                selectedSettingsMenu = SETTINGS_DEFAULT;
-                currentScreen = SCREEN_SETTINGS;
+                selectedDeviceSetting = DEVICE_SETTING_BRIGHTNESS;
+                currentScreen = SCREEN_SETTINGS_EMPTY;
                 okPress = false;
                 break;
 
@@ -825,31 +1605,171 @@ if(currentScreen == SCREEN_HOME)
                 currentScreen = SCREEN_ABOUT;
                 okPress = false;
                 break;
+
+            case MAIN_MENU_LIST:
+                selectedSettingsMenu = SETTINGS_DEFAULT;
+                currentScreen = SCREEN_SETTINGS;
+                okPress = false;
+                break;
+
+            case MAIN_MENU_BATTERY:
+                currentScreen = SCREEN_BATTERY_INFO;
+                okPress = false;
+                break;
+
+            case MAIN_MENU_REBOOT:
+                rebootConfirmItem = REBOOT_CONFIRM_NO;
+                currentScreen = SCREEN_REBOOT_CONFIRM;
+                okPress = false;
+                break;
+
+            default:
+                break;
         }
     }
 
-    // Return Home
-   
+    if(selectedMenu == MAIN_MENU_WIFI)
+    {
+        drawWifiMenuIcon(display);
+    }
+    else if(selectedMenu == MAIN_MENU_SETTINGS)
+    {
+        drawSettingsMenuIcon(display);
+    }
+    else if(selectedMenu == MAIN_MENU_ABOUT)
+    {
+        drawAboutMenuIcon(display);
+    }
+    else if(selectedMenu == MAIN_MENU_LIST)
+    {
+        drawListMenuIcon(display);
+    }
+    else if(selectedMenu == MAIN_MENU_BATTERY)
+    {
+        drawBatteryMenuIcon(display);
+    }
+    else
+    {
+        drawRebootMenuIcon(display);
+    }
 
+}
+
+if(currentScreen == SCREEN_REBOOT_CONFIRM)
+{
     display.setFont(u8g2_font_5x7_tr);
 
-    display.drawStr(
-        10,
-        24,
-        selectedMenu == MAIN_MENU_WIFI ? "> WiFi" : "  WiFi"
-    );
+    if(leftPress || rightPress)
+        rebootConfirmItem = rebootConfirmItem == REBOOT_CONFIRM_NO ? REBOOT_CONFIRM_YES : REBOOT_CONFIRM_NO;
 
-    display.drawStr(
-        10,
-        36,
-        selectedMenu == MAIN_MENU_SETTINGS ? "> Settings" : "  Settings"
-    );
+    if(okPress)
+    {
+        if(rebootConfirmItem == REBOOT_CONFIRM_YES)
+            ESP.restart();
+        else
+            currentScreen = SCREEN_MENU;
 
-    display.drawStr(
-        10,
-        48,
-        selectedMenu == MAIN_MENU_ABOUT ? "> About" : "  About"
-    );
+        okPress = false;
+    }
+
+    display.drawStr(20, 40, rebootConfirmItem == REBOOT_CONFIRM_NO ? "> No" : "  No");
+    display.drawStr(74, 40, rebootConfirmItem == REBOOT_CONFIRM_YES ? "> Yes" : "  Yes");
+}
+
+if(currentScreen == SCREEN_SETTINGS_EMPTY)
+{
+    display.setFont(u8g2_font_5x7_tr);
+
+    if(leftPress)
+    {
+        int currentItem = static_cast<int>(selectedDeviceSetting);
+        currentItem = (currentItem - 1 + DEVICE_SETTINGS_COUNT) % DEVICE_SETTINGS_COUNT;
+        selectedDeviceSetting = static_cast<DeviceSettingsItem>(currentItem);
+    }
+
+    if(rightPress)
+    {
+        int currentItem = static_cast<int>(selectedDeviceSetting);
+        currentItem = (currentItem + 1) % DEVICE_SETTINGS_COUNT;
+        selectedDeviceSetting = static_cast<DeviceSettingsItem>(currentItem);
+    }
+
+    if(okPress)
+    {
+        switch(selectedDeviceSetting)
+        {
+            case DEVICE_SETTING_BRIGHTNESS:
+                brightnessLevelIndex++;
+                if(brightnessLevelIndex >= BRIGHTNESS_LEVEL_COUNT)
+                    brightnessLevelIndex = 0;
+
+                applyDisplayBrightness();
+                saveUiSettings();
+                break;
+
+            case DEVICE_SETTING_LED:
+                ledAlertsEnabled = !ledAlertsEnabled;
+                if(!ledAlertsEnabled)
+                {
+                    digitalWrite(LEFT_LED_PIN, LOW);
+                    setRightLedBrightness(0);
+                }
+                saveUiSettings();
+                break;
+
+            case DEVICE_SETTING_BUZZER:
+                buzzerAlertsEnabled = !buzzerAlertsEnabled;
+                if(!buzzerAlertsEnabled)
+                {
+                    selectedAnimeAlertBeepOn = false;
+                    digitalWrite(BUZZER_PIN, LOW);
+                }
+                else
+                {
+                    digitalWrite(BUZZER_PIN, HIGH);
+                    delay(70);
+                    digitalWrite(BUZZER_PIN, LOW);
+                }
+                saveUiSettings();
+                break;
+        }
+
+        okPress = false;
+    }
+
+    const char *brightnessLabel = "High";
+    if(brightnessLevelIndex <= 0)
+        brightnessLabel = "Low";
+    else if(brightnessLevelIndex == 1)
+        brightnessLabel = "Med";
+    else if(brightnessLevelIndex == 2)
+        brightnessLabel = "High";
+    else
+        brightnessLabel = "Max";
+
+    String brightnessLine = String(selectedDeviceSetting == DEVICE_SETTING_BRIGHTNESS ? "> " : "  ") + "Brightness: " + brightnessLabel;
+    display.drawStr(2, 24, brightnessLine.c_str());
+
+    String ledLine = String(selectedDeviceSetting == DEVICE_SETTING_LED ? "> " : "  ") + "LED Alerts: " + (ledAlertsEnabled ? "On" : "Off");
+    display.drawStr(2, 34, ledLine.c_str());
+
+    String buzzerLine = String(selectedDeviceSetting == DEVICE_SETTING_BUZZER ? "> " : "  ") + "Buzzer: " + (buzzerAlertsEnabled ? "On" : "Off");
+    display.drawStr(2, 44, buzzerLine.c_str());
+}
+
+if(currentScreen == SCREEN_BATTERY_INFO)
+{
+    float batteryVolts = batteryVoltage();
+    char voltageInfo[20];
+    char percentInfo[20];
+
+    snprintf(voltageInfo, sizeof(voltageInfo), "Voltage: %.2fV", batteryVolts);
+    snprintf(percentInfo, sizeof(percentInfo), "Charge: %d%%", batteryLevel);
+
+    display.setFont(u8g2_font_5x7_tr);
+    drawBatteryStatusIcon(display, 34, 18, 60, 24, batteryLevel);
+    display.drawStr(26, 50, voltageInfo);
+    display.drawStr(29, 60, percentInfo);
 }
 
 if(currentScreen == SCREEN_WIFI_MENU)
@@ -1222,9 +2142,8 @@ if(currentScreen == SCREEN_SETTINGS)
         }
     }
 
-    display.drawStr(22, 26, "Settings");
-    display.drawStr(10, 40, selectedSettingsMenu == SETTINGS_DEFAULT ? "> Default" : "  Default");
-    display.drawStr(10, 52, selectedSettingsMenu == SETTINGS_SELECT_TITLE ? "> Select Title" : "  Select Title");
+    display.drawStr(10, 28, selectedSettingsMenu == SETTINGS_DEFAULT ? "> Default" : "  Default");
+    display.drawStr(10, 40, selectedSettingsMenu == SETTINGS_SELECT_TITLE ? "> Select Title" : "  Select Title");
 }
 
 if(currentScreen == SCREEN_SETTINGS_TITLE_MENU)
@@ -1262,9 +2181,8 @@ if(currentScreen == SCREEN_SETTINGS_TITLE_MENU)
         }
     }
 
-    display.drawStr(16, 26, "Select Title");
-    display.drawStr(10, 40, selectedTitleSource == TITLE_SOURCE_MOVIES ? "> Movies" : "  Movies");
-    display.drawStr(10, 52, selectedTitleSource == TITLE_SOURCE_ANIME ? "> Anime" : "  Anime");
+    display.drawStr(10, 28, selectedTitleSource == TITLE_SOURCE_MOVIES ? "> Movies" : "  Movies");
+    display.drawStr(10, 40, selectedTitleSource == TITLE_SOURCE_ANIME ? "> Anime" : "  Anime");
 }
 
 if(currentScreen == SCREEN_SETTINGS_MOVIES_COMING)
@@ -1400,21 +2318,20 @@ if(currentScreen == SCREEN_SETTINGS_ANIME_ACTION_MENU)
                 break;
 
             case ANIME_ACTION_CANCEL:
-                currentScreen = selectionMode == SELECTION_MODE_MOVIES ? SCREEN_SETTINGS_MOVIES_COMING : SCREEN_SETTINGS_ANIME_LIST;
+                currentScreen = SCREEN_MENU;
                 okPress = false;
                 break;
         }
     }
 
-    display.drawStr(22, 26, "Finish?");
-    display.drawStr(14, 40, selectedAnimeAction == ANIME_ACTION_DONE ? "> Done" : "  Done");
-    display.drawStr(14, 52, selectedAnimeAction == ANIME_ACTION_CANCEL ? "> Cancel" : "  Cancel");
+    display.drawStr(14, 28, selectedAnimeAction == ANIME_ACTION_DONE ? "> Done" : "  Done");
+    display.drawStr(14, 40, selectedAnimeAction == ANIME_ACTION_CANCEL ? "> Cancel" : "  Cancel");
 }
 
 if(currentScreen == SCREEN_SETTINGS_DONE)
 {
     display.setFont(u8g2_font_5x7_tr);
-    display.drawStr(24, 40, "Done");
+    display.drawStr(24, 28, "Done");
 
     if(millis() > selectionDoneUntil)
         currentScreen = SCREEN_HOME;

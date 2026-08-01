@@ -6,7 +6,6 @@
 #include <ArduinoJson.h>
 #include <time.h>
 
-
 Movie movies[MAX_MOVIES];
 int movieCount = 0;
 MovieChoice seasonMovieChoices[MAX_MOVIE_CHOICES];
@@ -38,23 +37,15 @@ bool isFutureDate(String date)
     if(date.length() < 10)
         return false;
 
-
     int year = date.substring(0,4).toInt();
     int month = date.substring(5,7).toInt();
     int day = date.substring(8,10).toInt();
 
+    String today = currentDate();
 
-String today = currentDate();
-
-int currentYear =
-today.substring(0,4).toInt();
-
-int currentMonth =
-today.substring(5,7).toInt();
-
-int currentDay =
-today.substring(8,10).toInt();
-
+    int currentYear = today.substring(0,4).toInt();
+    int currentMonth = today.substring(5,7).toInt();
+    int currentDay = today.substring(8,10).toInt();
 
     if(year > currentYear)
         return true;
@@ -65,7 +56,6 @@ today.substring(8,10).toInt();
     if(year == currentYear && month == currentMonth && day >= currentDay)
         return true;
 
-
     return false;
 }
 
@@ -75,11 +65,8 @@ String formatDate(String date)
     if(date.length() < 10)
         return date;
 
-
     String month;
-
     String m = date.substring(5,7);
-
 
     if(m=="01") month="Jan";
     else if(m=="02") month="Feb";
@@ -94,16 +81,13 @@ String formatDate(String date)
     else if(m=="11") month="Nov";
     else if(m=="12") month="Dec";
 
-
     return date.substring(8,10) + " " + month;
 }
 
-
-
-void fetchMovies()
+bool fetchMovies()
 {
     if(WiFi.status() != WL_CONNECTED)
-        return;
+        return false;
 
     String today = currentDate();
     String startDate = today.length() >= 10 ? today : "1970-01-01";
@@ -115,113 +99,84 @@ void fetchMovies()
     + "&primary_release_date.gte=" + startDate
     + "&sort_by=popularity.desc";
 
-
     HTTPClient http;
-
     http.begin(url);
 
-
     int code = http.GET();
-
-
-    if(code == 200)
+    if(code != 200)
     {
-        String payload = http.getString();
+        http.end();
+        return false;
+    }
 
+    String payload = http.getString();
+    DynamicJsonDocument doc(12000);
 
-        DynamicJsonDocument doc(12000);
+    if(deserializeJson(doc, payload))
+    {
+        http.end();
+        return false;
+    }
 
+    JsonArray results = doc["results"];
 
-        if(deserializeJson(doc, payload))
+    struct MovieCandidate
+    {
+        String title;
+        String date;
+        int popularity;
+        bool selected;
+    };
+
+    MovieCandidate candidates[20];
+    int candidateCount = 0;
+
+    for(JsonObject item : results)
+    {
+        if(candidateCount >= 20)
+            break;
+
+        String release = item["release_date"].as<String>();
+
+        if(!isFutureDate(release))
+            continue;
+
+        candidates[candidateCount].title = item["title"].as<String>();
+        candidates[candidateCount].date = formatDate(release);
+        candidates[candidateCount].popularity = item["popularity"].as<int>();
+        candidates[candidateCount].selected = isSelectedMovieTitle(candidates[candidateCount].title);
+        candidateCount++;
+    }
+
+    for(int i = 0; i < candidateCount - 1; i++)
+    {
+        for(int j = i + 1; j < candidateCount; j++)
         {
-            http.end();
-            return;
-        }
-
-
-        JsonArray results = doc["results"];
-
-        struct MovieCandidate
-        {
-            String title;
-            String date;
-            int popularity;
-            bool selected;
-        };
-
-        MovieCandidate candidates[20];
-        int candidateCount = 0;
-
-        for(JsonObject item : results)
-        {
-            if(candidateCount >= 20)
-                break;
-
-            String release = item["release_date"].as<String>();
-
-            if(!isFutureDate(release))
-                continue;
-
-            candidates[candidateCount].title = item["title"].as<String>();
-            candidates[candidateCount].date = formatDate(release);
-            candidates[candidateCount].popularity = item["popularity"].as<int>();
-            candidates[candidateCount].selected = isSelectedMovieTitle(candidates[candidateCount].title);
-            candidateCount++;
-        }
-
-        for(int i = 0; i < candidateCount - 1; i++)
-        {
-            for(int j = i + 1; j < candidateCount; j++)
+            if(candidates[j].popularity > candidates[i].popularity)
             {
-                if(candidates[j].popularity > candidates[i].popularity)
-                {
-                    MovieCandidate temp = candidates[i];
-                    candidates[i] = candidates[j];
-                    candidates[j] = temp;
-                }
+                MovieCandidate temp = candidates[i];
+                candidates[i] = candidates[j];
+                candidates[j] = temp;
             }
         }
+    }
 
-        movieCount = 0;
+    movieCount = 0;
 
-        for(int i = 0; i < MAX_MOVIES; i++)
+    for(int i = 0; i < MAX_MOVIES; i++)
+    {
+        movies[i].title = "";
+        movies[i].date = "";
+        movies[i].popularity = 0;
+    }
+
+    int outputIndex = 0;
+
+    if(selectedMovieTitleCount > 0)
+    {
+        for(int i = 0; i < candidateCount; i++)
         {
-            movies[i].title = "";
-            movies[i].date = "";
-            movies[i].popularity = 0;
-        }
-
-        int outputIndex = 0;
-
-        if(selectedMovieTitleCount > 0)
-        {
-            for(int i = 0; i < candidateCount; i++)
-            {
-                if(!candidates[i].selected)
-                    continue;
-
-                movies[outputIndex].title = candidates[i].title;
-                movies[outputIndex].date = candidates[i].date;
-                movies[outputIndex].popularity = candidates[i].popularity;
-                movieCount++;
-                outputIndex++;
-                break;
-            }
-        }
-
-        for(int i = 0; i < candidateCount && outputIndex < MAX_MOVIES; i++)
-        {
-            if(outputIndex == 0)
-            {
-                movies[outputIndex].title = candidates[i].title;
-                movies[outputIndex].date = candidates[i].date;
-                movies[outputIndex].popularity = candidates[i].popularity;
-                movieCount++;
-                outputIndex++;
-                continue;
-            }
-
-            if(movies[0].title.length() > 0 && candidates[i].title == movies[0].title)
+            if(!candidates[i].selected)
                 continue;
 
             movies[outputIndex].title = candidates[i].title;
@@ -229,11 +184,34 @@ void fetchMovies()
             movies[outputIndex].popularity = candidates[i].popularity;
             movieCount++;
             outputIndex++;
+            break;
         }
     }
 
+    for(int i = 0; i < candidateCount && outputIndex < MAX_MOVIES; i++)
+    {
+        if(outputIndex == 0)
+        {
+            movies[outputIndex].title = candidates[i].title;
+            movies[outputIndex].date = candidates[i].date;
+            movies[outputIndex].popularity = candidates[i].popularity;
+            movieCount++;
+            outputIndex++;
+            continue;
+        }
+
+        if(movies[0].title.length() > 0 && candidates[i].title == movies[0].title)
+            continue;
+
+        movies[outputIndex].title = candidates[i].title;
+        movies[outputIndex].date = candidates[i].date;
+        movies[outputIndex].popularity = candidates[i].popularity;
+        movieCount++;
+        outputIndex++;
+    }
 
     http.end();
+    return true;
 }
 
 void fetchSeasonMovieChoices()

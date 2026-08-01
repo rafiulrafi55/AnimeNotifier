@@ -29,7 +29,7 @@ extern int seasonMovieCount;
 extern String selectedMovieTitles[MAX_MOVIE_CHOICES];
 extern int selectedMovieTitleCount;
 
-void fetchMovies();
+bool fetchMovies();
 void fetchSeasonMovieChoices();
 
 #endif

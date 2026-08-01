@@ -1,6 +1,6 @@
 {
   "idf.currentSetup": "C:/Espressif/frameworks/esp-idf-v5.5.5/",
-  "idf.portWin": "COM8",
+  "idf.portWin": "COM12",
   "C_Cpp_Runner.cCompilerPath": "gcc",
   "C_Cpp_Runner.cppCompilerPath": "g++",
   "C_Cpp_Runner.debuggerPath": "gdb",

@@ -4,6 +4,6 @@
 #include <Arduino.h>
 #include <U8g2lib.h>
 
-void drawHeader(U8G2 &display, int batteryLevel, const char *ssid);
+void drawHeader(U8G2 &display, int batteryLevel, const char *timeText, const char *ssid);
 
 #endif

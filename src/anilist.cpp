@@ -96,14 +96,11 @@ String formatAnimeTimeLabel(long timestamp)
     return String(timeBuffer) + " " + dateBuffer;
 }
 
-void fetchAnime()
+bool fetchAnime()
 {
-    Serial.println("Fetching anime data...");
-
     if (WiFi.status() != WL_CONNECTED)
     {
-        Serial.println("No WiFi connection, aborting.");
-        return;
+        return false;
     }
 
     WiFiClientSecure client;
@@ -159,9 +156,8 @@ void fetchAnime()
 
         if (code != 200)
         {
-            Serial.printf("HTTP Error Code: %d\n", code);
             http.end();
-            return;
+            return false;
         }
 
         String payload = http.getString();
@@ -171,9 +167,8 @@ void fetchAnime()
         DeserializationError error = deserializeJson(doc, payload);
         if (error)
         {
-            Serial.printf("JSON Error: %s\n", error.c_str());
             http.end();
-            return;
+            return false;
         }
 
         JsonObject pageInfo = doc["data"]["Page"]["pageInfo"];
@@ -259,13 +254,11 @@ void fetchAnime()
     }
 
     http.end();
-    Serial.println("Finished fetching anime data.");
+    return true;
 }
 
 void fetchSeasonAnimeChoices()
 {
-        Serial.println("Fetching current season anime choices...");
-
         if(WiFi.status() != WL_CONNECTED)
                 return;
 
