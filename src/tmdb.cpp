@@ -106,16 +106,13 @@ void fetchMovies()
         return;
 
     String today = currentDate();
-    int currentYear = currentYearValue();
-    String startDate = today.length() >= 10 ? today : (String(currentYear) + "-01-01");
-    String endDate = String(currentYear) + "-12-31";
+    String startDate = today.length() >= 10 ? today : "1970-01-01";
 
     String url =
     "https://api.themoviedb.org/3/discover/movie?api_key="
     + String(TMDB_API_KEY)
     + "&language=en-US&page=1"
     + "&primary_release_date.gte=" + startDate
-    + "&primary_release_date.lte=" + endDate
     + "&sort_by=popularity.desc";
 
 
@@ -163,10 +160,6 @@ void fetchMovies()
             String release = item["release_date"].as<String>();
 
             if(!isFutureDate(release))
-                continue;
-
-            int releaseYear = release.substring(0, 4).toInt();
-            if(releaseYear != currentYear)
                 continue;
 
             candidates[candidateCount].title = item["title"].as<String>();
@@ -228,7 +221,7 @@ void fetchMovies()
                 continue;
             }
 
-            if(selectedMovieTitleCount > 0 && candidates[i].selected)
+            if(movies[0].title.length() > 0 && candidates[i].title == movies[0].title)
                 continue;
 
             movies[outputIndex].title = candidates[i].title;

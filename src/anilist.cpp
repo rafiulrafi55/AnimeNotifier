@@ -137,10 +137,12 @@ void fetchAnime()
         long airingAt;
     };
 
+    bool useSelectedPriority = selectedAnimeTitleCount > 0;
     AnimeRow selectedRow;
-    AnimeRow generalRows[2];
+    AnimeRow generalRows[3];
     int generalCount = 0;
     bool hasSelectedRow = false;
+    int targetGeneralCount = useSelectedPriority ? 2 : 3;
 
     for(int page = 1; page <= 20; page++)
     {
@@ -182,7 +184,7 @@ void fetchAnime()
 
         for (JsonObject item : results)
         {
-            if(hasSelectedRow && generalCount >= 2)
+            if((useSelectedPriority && hasSelectedRow && generalCount >= targetGeneralCount) || (!useSelectedPriority && generalCount >= targetGeneralCount))
                 break;
 
             String title = item["media"]["title"]["romaji"] | "Unknown Title";
@@ -218,7 +220,7 @@ void fetchAnime()
             if(alreadyAdded)
                 continue;
 
-            if(generalCount < 2)
+            if(generalCount < targetGeneralCount)
             {
                 generalRows[generalCount].title = title;
                 generalRows[generalCount].time = timeLabel;
@@ -240,7 +242,7 @@ void fetchAnime()
 
     int outputIndex = 0;
 
-    if(hasSelectedRow)
+    if(useSelectedPriority && hasSelectedRow)
     {
         animeList[0].title = selectedRow.title;
         animeList[0].time = selectedRow.time;
