@@ -9,6 +9,7 @@
 
 
 void buttonsInit();
+void buttonsUpdate();
 
 
 bool okPressed();

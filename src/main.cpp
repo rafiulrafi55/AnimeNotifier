@@ -20,6 +20,8 @@ Preferences prefs;
 unsigned long wifiConnectStart = 0;
 bool wifiConnecting = false;
 bool wifiSaved = false;
+bool wifiHasSavedCredentials = false;
+bool wifiConnectionFailed = false;
 unsigned long movieUpdateTimer = 0;
 unsigned long animeUpdateTimer = 0;
 
@@ -42,6 +44,11 @@ enum Screen
     SCREEN_WIFI_CONNECTING,
 
     SCREEN_SETTINGS,
+    SCREEN_SETTINGS_TITLE_MENU,
+    SCREEN_SETTINGS_MOVIES_COMING,
+    SCREEN_SETTINGS_ANIME_LIST,
+    SCREEN_SETTINGS_ANIME_ACTION_MENU,
+    SCREEN_SETTINGS_DONE,
     SCREEN_ABOUT
 };
 
@@ -52,8 +59,29 @@ enum MainMenuItem
     MAIN_MENU_ABOUT
 };
 
+enum SettingsMenuItem
+{
+    SETTINGS_DEFAULT,
+    SETTINGS_SELECT_TITLE
+};
+
+enum TitleSourceItem
+{
+    TITLE_SOURCE_MOVIES,
+    TITLE_SOURCE_ANIME
+};
+
+enum AnimeActionItem
+{
+    ANIME_ACTION_DONE,
+    ANIME_ACTION_CANCEL
+};
+
 Screen currentScreen = SCREEN_HOME;
 MainMenuItem selectedMenu = MAIN_MENU_WIFI;
+SettingsMenuItem selectedSettingsMenu = SETTINGS_DEFAULT;
+TitleSourceItem selectedTitleSource = TITLE_SOURCE_MOVIES;
+AnimeActionItem selectedAnimeAction = ANIME_ACTION_DONE;
 
 enum WifiMenuItem
 {
@@ -107,6 +135,129 @@ enum KeyboardMode
 };
 
 KeyboardMode keyboardMode = MODE_LOWER;
+
+AnimeChoice seasonAnimeChoices[MAX_ANIME_CHOICES];
+int seasonAnimeCount = 0;
+String selectedAnimeTitles[MAX_ANIME_CHOICES];
+int selectedAnimeTitleCount = 0;
+int seasonAnimeCursor = 0;
+int seasonAnimeTop = 0;
+unsigned long selectionDoneUntil = 0;
+const int VISIBLE_ANIME_CHOICES = 7;
+
+bool animeTitleIsSelected(const String &title)
+{
+    for(int i = 0; i < selectedAnimeTitleCount; i++)
+    {
+        if(selectedAnimeTitles[i] == title)
+            return true;
+    }
+
+    return false;
+}
+
+void loadSelectedAnimeTitles()
+{
+    selectedAnimeTitleCount = 0;
+
+    prefs.begin("anime", true);
+    String stored = prefs.getString("titles", "");
+    prefs.end();
+
+    while(stored.length() > 0 && selectedAnimeTitleCount < MAX_ANIME_CHOICES)
+    {
+        int separator = stored.indexOf('\n');
+        String entry = separator >= 0 ? stored.substring(0, separator) : stored;
+        entry.trim();
+
+        if(entry.length() > 0)
+            selectedAnimeTitles[selectedAnimeTitleCount++] = entry;
+
+        if(separator < 0)
+            break;
+
+        stored = stored.substring(separator + 1);
+    }
+}
+
+void saveSelectedAnimeTitles()
+{
+    String stored;
+
+    for(int i = 0; i < selectedAnimeTitleCount; i++)
+    {
+        if(i > 0)
+            stored += '\n';
+
+        stored += selectedAnimeTitles[i];
+    }
+
+    prefs.begin("anime", false);
+    prefs.putString("titles", stored);
+    prefs.end();
+}
+
+void clearSelectedAnimeTitles()
+{
+    selectedAnimeTitleCount = 0;
+    prefs.begin("anime", false);
+    prefs.putString("titles", "");
+    prefs.end();
+}
+
+void syncSelectedAnimeChoices()
+{
+    for(int i = 0; i < seasonAnimeCount; i++)
+        seasonAnimeChoices[i].selected = animeTitleIsSelected(seasonAnimeChoices[i].title);
+}
+
+void rebuildSelectedAnimeTitlesFromChoices()
+{
+    selectedAnimeTitleCount = 0;
+
+    for(int i = 0; i < seasonAnimeCount; i++)
+    {
+        if(!seasonAnimeChoices[i].selected)
+            continue;
+
+        if(selectedAnimeTitleCount >= MAX_ANIME_CHOICES)
+            break;
+
+        selectedAnimeTitles[selectedAnimeTitleCount++] = seasonAnimeChoices[i].title;
+    }
+}
+
+String trimDisplayText(const String &text, size_t maxChars)
+{
+    if (text.length() <= maxChars)
+        return text;
+
+    return text.substring(0, maxChars);
+}
+
+void drawScrollingText(U8G2 &oled, int x, int y, int width, const String &text, unsigned long now)
+{
+    if (text.length() == 0)
+        return;
+
+    int textWidth = oled.getStrWidth(text.c_str());
+
+    if (textWidth <= width)
+    {
+        oled.drawStr(x, y, text.c_str());
+        return;
+    }
+
+    const int gap = 16;
+    const unsigned long frameMs = 35;
+    int cycle = textWidth + gap;
+    int offset = (now / frameMs) % cycle;
+    int drawX = x + width - offset;
+
+    oled.setClipWindow(x, y - 6, x + width - 1, y + 1);
+    oled.drawStr(drawX, y, text.c_str());
+    oled.setClipWindow(0, 0, 127, 63);
+}
 
 const char* getCurrentCharset()
 {
@@ -197,6 +348,11 @@ prefs.end();
 
 if(savedSSID.length())
 {
+    wifiHasSavedCredentials = true;
+    wifiConnecting = true;
+    wifiConnectionFailed = false;
+    wifiConnectStart = millis();
+
     WiFi.scanDelete();
 
     WiFi.mode(WIFI_STA);
@@ -208,45 +364,129 @@ if(savedSSID.length())
         savedPass.c_str()
     );
 }
+else
+{
+    wifiHasSavedCredentials = false;
+    wifiConnecting = false;
+    wifiConnectionFailed = false;
+}
+
+loadSelectedAnimeTitles();
 }
 
 
 void loop()
 {
+    buttonsUpdate();
+
+    bool okPress = okPressed();
+    bool okLongPress = okLongPressed();
+    bool leftPress = leftPressed();
+    bool rightPress = rightPressed();
+
     display.clearBuffer();
     if(WiFi.status() == WL_CONNECTED)
 {
+    wifiConnecting = false;
+    wifiConnectionFailed = false;
+    wifiHasSavedCredentials = true;
+
     currentSSID = WiFi.SSID();
 }
 
     drawHeader(display, batteryPercent(), currentSSID.c_str());
-    // Universal Back / Menu
-if(okLongPressed())
-{
-    switch(currentScreen)
+
+    if(wifiConnecting && WiFi.status() != WL_CONNECTED && millis() - wifiConnectStart > 20000)
     {
-        case SCREEN_HOME:
-            currentScreen = SCREEN_MENU;
-            break;
-
-        case SCREEN_MENU:
-            currentScreen = SCREEN_HOME;
-            break;
-
-        case SCREEN_WIFI_PASSWORD:
-            keyboardMenu = KEY_DONE;
-            currentScreen = SCREEN_KEYBOARD_MENU;
-            break;
-
-        case SCREEN_KEYBOARD_MENU:
-            currentScreen = SCREEN_WIFI_PASSWORD;
-            break;
-
-        default:
-            currentScreen = SCREEN_MENU;
-            break;
+        wifiConnecting = false;
+        wifiConnectionFailed = true;
     }
-}
+
+    if(WiFi.status() == WL_CONNECTED)
+    {
+        if(!timeReady())
+        {
+            initTime();
+            setenv("TZ","Asia/Dhaka",1);
+            tzset();
+
+            delay(100);
+        }
+
+        unsigned long now = millis();
+
+        if(now - movieUpdateTimer > UPDATE_INTERVAL || !moviesLoaded)
+        {
+            fetchMovies();
+            movieUpdateTimer = now;
+            moviesLoaded = true;
+        }
+
+        if(now - animeUpdateTimer > UPDATE_INTERVAL || !animeLoaded)
+        {
+            fetchAnime();
+
+            animeUpdateTimer = now;
+
+            animeLoaded = true;
+
+            delay(500);
+        }
+
+        if(currentScreen == SCREEN_WIFI_CONNECTING)
+            currentScreen = SCREEN_HOME;
+    }
+
+    // Home menu shortcut uses a single OK press.
+    if(currentScreen == SCREEN_HOME && okPress)
+    {
+        currentScreen = SCREEN_MENU;
+        okPress = false;
+    }
+
+    // Keep long-press back behavior on deeper screens.
+    if(okLongPress)
+    {
+        switch(currentScreen)
+        {
+            case SCREEN_MENU:
+                currentScreen = SCREEN_HOME;
+                break;
+
+            case SCREEN_SETTINGS_ANIME_LIST:
+                currentScreen = SCREEN_SETTINGS_ANIME_ACTION_MENU;
+                break;
+
+            case SCREEN_WIFI_PASSWORD:
+                keyboardMenu = KEY_DONE;
+                currentScreen = SCREEN_KEYBOARD_MENU;
+                break;
+
+            case SCREEN_KEYBOARD_MENU:
+                currentScreen = SCREEN_WIFI_PASSWORD;
+                break;
+
+            case SCREEN_SETTINGS_TITLE_MENU:
+                currentScreen = SCREEN_SETTINGS;
+                break;
+
+            case SCREEN_SETTINGS_MOVIES_COMING:
+                currentScreen = SCREEN_SETTINGS_TITLE_MENU;
+                break;
+
+            case SCREEN_SETTINGS_ANIME_ACTION_MENU:
+                currentScreen = SCREEN_SETTINGS_ANIME_LIST;
+                break;
+
+            case SCREEN_SETTINGS:
+                currentScreen = SCREEN_HOME;
+                break;
+
+            default:
+                currentScreen = SCREEN_MENU;
+                break;
+        }
+    }
 
 
 
@@ -255,40 +495,57 @@ if(currentScreen == SCREEN_HOME)
 {
     display.setFont(u8g2_font_4x6_tr);
 
+    const int animeX = 1;
+    const int movieX = 66;
+    const int titleWidth = 60;
+    unsigned long scrollNow = millis();
 
-    for(int i=0;i<3;i++)
+
+    bool showStatusOnly = (!wifiHasSavedCredentials && !wifiConnecting && !wifiConnectionFailed) || wifiConnecting || wifiConnectionFailed;
+
+    if(showStatusOnly)
     {
-        int y = 20 + i*14;
+        if(wifiConnectionFailed)
+        {
+            display.drawStr(14, 34, "Connection failed");
+        }
+        else if(wifiConnecting)
+        {
+            display.drawStr(14, 34, "Connecting to WiFi...");
+        }
+        else
+        {
+            display.drawStr(8, 30, "Connect to WiFi first");
+        }
+    }
+    else
+    {
+        for(int i=0;i<3;i++)
+        {
+            int y = 20 + i*14;
 
 
-        // Anime left
-display.drawStr(
-    0,
-    y,
-    animeList[i].title.c_str()
-);
+            // Anime left
+            drawScrollingText(display, animeX, y, titleWidth, animeList[i].title, scrollNow);
 
-display.drawStr(
-    0,
-    y+6,
-    animeList[i].time.c_str()
-);
+            display.drawStr(
+                animeX,
+                y+6,
+                trimDisplayText(animeList[i].time, 12).c_str()
+            );
 
 
-        // Movie title
-        display.drawStr(
-            65,
-            y,
-            movies[i].title.c_str()
-        );
+            // Movie title
+            drawScrollingText(display, movieX, y, titleWidth, movies[i].title, scrollNow);
 
 
-        // Date
-        display.drawStr(
-            65,
-            y+6,
-            movies[i].date.c_str()
-        );
+            // Date
+            display.drawStr(
+                movieX,
+                y+6,
+                trimDisplayText(movies[i].date, 12).c_str()
+            );
+        }
     }
 }
 
@@ -296,7 +553,7 @@ display.drawStr(
    if(currentScreen == SCREEN_MENU)
 {
     // Navigation
-    if(leftPressed())
+    if(leftPress)
     {
         if(selectedMenu == MAIN_MENU_WIFI)
             selectedMenu = MAIN_MENU_ABOUT;
@@ -304,7 +561,7 @@ display.drawStr(
             selectedMenu = (MainMenuItem)(selectedMenu - 1);
     }
 
-    if(rightPressed())
+    if(rightPress)
     {
         if(selectedMenu == MAIN_MENU_ABOUT)
             selectedMenu = MAIN_MENU_WIFI;
@@ -313,20 +570,23 @@ display.drawStr(
     }
 
     // Open selected item
-    if(okPressed())
+    if(okPress)
     {
         switch(selectedMenu)
         {
             case MAIN_MENU_WIFI:
                 currentScreen = SCREEN_WIFI_MENU;
+                okPress = false;
                 break;
 
             case MAIN_MENU_SETTINGS:
                 currentScreen = SCREEN_SETTINGS;
+                okPress = false;
                 break;
 
             case MAIN_MENU_ABOUT:
                 currentScreen = SCREEN_ABOUT;
+                okPress = false;
                 break;
         }
     }
@@ -357,12 +617,12 @@ display.drawStr(
 
 if(currentScreen == SCREEN_WIFI_MENU)
 {
-    if(leftPressed())
+    if(leftPress)
     {
         wifiMenu = (wifiMenu == WIFI_OPTION_SCAN) ? WIFI_OPTION_MANUAL : WIFI_OPTION_SCAN;
     }
 
-    if(rightPressed())
+    if(rightPress)
     {
         wifiMenu = (wifiMenu == WIFI_OPTION_MANUAL) ? WIFI_OPTION_SCAN : WIFI_OPTION_MANUAL;
     }
@@ -381,7 +641,7 @@ if(currentScreen == SCREEN_WIFI_MENU)
         wifiMenu == WIFI_OPTION_MANUAL ? "> Manual Entry" : "  Manual Entry"
     );
 
-    if(okPressed())
+    if(okPress)
     {
         switch(wifiMenu)
         {
@@ -392,10 +652,12 @@ selectedNetwork = 0;
 networkTop = 0;
 
 currentScreen = SCREEN_WIFI_SCAN;
+    okPress = false;
     break;
 
 case WIFI_OPTION_MANUAL:
     currentScreen = SCREEN_WIFI_KEYBOARD;
+    okPress = false;
     break;
         }
     }
@@ -411,7 +673,7 @@ if(currentScreen == SCREEN_WIFI_SCAN)
     }
 
     // Navigation
-    if(leftPressed())
+    if(leftPress)
     {
         if(selectedNetwork > 0)
         {
@@ -422,7 +684,7 @@ if(currentScreen == SCREEN_WIFI_SCAN)
         }
     }
 
-    if(rightPressed())
+    if(rightPress)
     {
         if(selectedNetwork < networkCount - 1)
         {
@@ -434,7 +696,7 @@ if(currentScreen == SCREEN_WIFI_SCAN)
     }
 
     // Select network
-    if(okPressed())
+    if(okPress)
 {
     if(networkCount > 0)
     {
@@ -445,6 +707,7 @@ if(currentScreen == SCREEN_WIFI_SCAN)
         keyboardMode = MODE_LOWER;
 
         currentScreen = SCREEN_WIFI_PASSWORD;
+        okPress = false;
     }
 }
 
@@ -528,7 +791,7 @@ if(charIndex >= charsetLength)
 
 if(currentScreen == SCREEN_KEYBOARD_MENU)
 {
-    if(leftPressed())
+    if(leftPress)
     {
         if(keyboardMenu == KEY_DONE)
             keyboardMenu = KEY_CANCEL;
@@ -536,7 +799,7 @@ if(currentScreen == SCREEN_KEYBOARD_MENU)
             keyboardMenu = (KeyboardMenuItem)(keyboardMenu - 1);
     }
 
-    if(rightPressed())
+    if(rightPress)
     {
         if(keyboardMenu == KEY_CANCEL)
             keyboardMenu = KEY_DONE;
@@ -544,21 +807,28 @@ if(currentScreen == SCREEN_KEYBOARD_MENU)
             keyboardMenu = (KeyboardMenuItem)(keyboardMenu + 1);
     }
 
-    if(okPressed())
+    if(okPress)
     {
         switch(keyboardMenu)
         {
             case KEY_DONE:
+            {
 
     wifiConnectStart = millis();
 wifiConnecting = true;
+wifiConnectionFailed = false;
 wifiSaved = false;
 
-wifiConnect(selectedSSID, password);
+bool connected = wifiConnect(selectedSSID, password);
+
+wifiConnecting = false;
+wifiConnectionFailed = !connected;
+wifiHasSavedCredentials = true;
 
 currentScreen = SCREEN_WIFI_CONNECTING;
 
     break;
+            }
 
             case KEY_DELETE:
                 if(password.length() > 0)
@@ -583,7 +853,9 @@ currentScreen = SCREEN_WIFI_CONNECTING;
                 break;
 
             case KEY_CANCEL:
-                currentScreen = SCREEN_WIFI_PASSWORD;
+                password = "";
+                charIndex = 0;
+                currentScreen = SCREEN_HOME;
                 break;
         }
     }
@@ -671,53 +943,189 @@ if(currentScreen == SCREEN_WIFI_CONNECTING)
         delay(1000);
 
     }
+    else if(wifiConnectionFailed)
+    {
+        display.drawStr(10,25,"Connection failed");
+    }
     else
     {
         display.drawStr(20,25,"Connecting...");
     }
 }
-if(WiFi.status() == WL_CONNECTED)
-{
-    if(!timeReady())
-{
-    initTime();
-    setenv("TZ","Asia/Dhaka",1);
-tzset();
-
-    delay(100);
-}
-    unsigned long now = millis();
-
-
-if(now - movieUpdateTimer > UPDATE_INTERVAL || !moviesLoaded)
-{
-    fetchMovies();
-    movieUpdateTimer = now;
-    moviesLoaded = true;
-}
-
-
-if(now - animeUpdateTimer > UPDATE_INTERVAL || !animeLoaded)
-{
-    fetchAnime();
-
-animeUpdateTimer = now;
-
-animeLoaded = true;
-
-delay(500);
-}
-
-    currentScreen = SCREEN_HOME;
-}
-
-
 
 
 if(currentScreen == SCREEN_SETTINGS)
 {
     display.setFont(u8g2_font_5x7_tr);
-    display.drawStr(25,35,"Settings");
+
+    if(leftPress)
+        selectedSettingsMenu = (selectedSettingsMenu == SETTINGS_DEFAULT) ? SETTINGS_SELECT_TITLE : SETTINGS_DEFAULT;
+
+    if(rightPress)
+        selectedSettingsMenu = (selectedSettingsMenu == SETTINGS_SELECT_TITLE) ? SETTINGS_DEFAULT : SETTINGS_SELECT_TITLE;
+
+    if(okPress)
+    {
+        switch(selectedSettingsMenu)
+        {
+            case SETTINGS_DEFAULT:
+                clearSelectedAnimeTitles();
+                animeLoaded = false;
+                currentScreen = SCREEN_HOME;
+                okPress = false;
+                break;
+
+            case SETTINGS_SELECT_TITLE:
+                selectedTitleSource = TITLE_SOURCE_MOVIES;
+                currentScreen = SCREEN_SETTINGS_TITLE_MENU;
+                okPress = false;
+                break;
+        }
+    }
+
+    display.drawStr(22, 26, "Settings");
+    display.drawStr(10, 40, selectedSettingsMenu == SETTINGS_DEFAULT ? "> Default" : "  Default");
+    display.drawStr(10, 52, selectedSettingsMenu == SETTINGS_SELECT_TITLE ? "> Select Title" : "  Select Title");
+}
+
+if(currentScreen == SCREEN_SETTINGS_TITLE_MENU)
+{
+    display.setFont(u8g2_font_5x7_tr);
+
+    if(leftPress)
+        selectedTitleSource = TITLE_SOURCE_MOVIES;
+
+    if(rightPress)
+        selectedTitleSource = TITLE_SOURCE_ANIME;
+
+    if(okPress)
+    {
+        switch(selectedTitleSource)
+        {
+            case TITLE_SOURCE_MOVIES:
+                currentScreen = SCREEN_SETTINGS_MOVIES_COMING;
+                okPress = false;
+                break;
+
+            case TITLE_SOURCE_ANIME:
+                fetchSeasonAnimeChoices();
+                syncSelectedAnimeChoices();
+                seasonAnimeCursor = 0;
+                seasonAnimeTop = 0;
+                currentScreen = SCREEN_SETTINGS_ANIME_LIST;
+                okPress = false;
+                break;
+        }
+    }
+
+    display.drawStr(16, 26, "Select Title");
+    display.drawStr(10, 40, selectedTitleSource == TITLE_SOURCE_MOVIES ? "> Movies" : "  Movies");
+    display.drawStr(10, 52, selectedTitleSource == TITLE_SOURCE_ANIME ? "> Anime" : "  Anime");
+}
+
+if(currentScreen == SCREEN_SETTINGS_MOVIES_COMING)
+{
+    display.setFont(u8g2_font_5x7_tr);
+    display.drawStr(20, 26, "Movies");
+    display.drawStr(12, 42, "Coming Soon");
+
+    if(okPress)
+    {
+        currentScreen = SCREEN_SETTINGS_TITLE_MENU;
+        okPress = false;
+    }
+}
+
+if(currentScreen == SCREEN_SETTINGS_ANIME_LIST)
+{
+    display.setFont(u8g2_font_5x7_tr);
+
+    if(leftPress && seasonAnimeCount > 0)
+    {
+        if(seasonAnimeCursor > 0)
+            seasonAnimeCursor--;
+
+        if(seasonAnimeCursor < seasonAnimeTop)
+            seasonAnimeTop--;
+    }
+
+    if(rightPress && seasonAnimeCount > 0)
+    {
+        if(seasonAnimeCursor < seasonAnimeCount - 1)
+        {
+            seasonAnimeCursor++;
+
+            if(seasonAnimeCursor > seasonAnimeTop + (VISIBLE_ANIME_CHOICES - 1))
+                seasonAnimeTop++;
+        }
+    }
+
+    if(okPress && seasonAnimeCount > 0)
+    {
+        seasonAnimeChoices[seasonAnimeCursor].selected = !seasonAnimeChoices[seasonAnimeCursor].selected;
+        okPress = false;
+    }
+
+    if(seasonAnimeCount == 0)
+    {
+        display.drawStr(18, 34, "No titles");
+    }
+    else
+    {
+        for(int i = 0; i < VISIBLE_ANIME_CHOICES; i++)
+        {
+            int index = seasonAnimeTop + i;
+
+            if(index >= seasonAnimeCount)
+                break;
+
+            int y = 18 + (i * 7);
+            display.drawStr(2, y, index == seasonAnimeCursor ? ">" : " ");
+            display.drawStr(8, y, seasonAnimeChoices[index].selected ? "*" : " ");
+            drawScrollingText(display, 14, y, 110, seasonAnimeChoices[index].title, millis());
+        }
+    }
+}
+
+if(currentScreen == SCREEN_SETTINGS_ANIME_ACTION_MENU)
+{
+    display.setFont(u8g2_font_5x7_tr);
+
+    if(leftPress || rightPress)
+        selectedAnimeAction = (selectedAnimeAction == ANIME_ACTION_DONE) ? ANIME_ACTION_CANCEL : ANIME_ACTION_DONE;
+
+    if(okPress)
+    {
+        switch(selectedAnimeAction)
+        {
+            case ANIME_ACTION_DONE:
+                rebuildSelectedAnimeTitlesFromChoices();
+                saveSelectedAnimeTitles();
+                animeLoaded = false;
+                selectionDoneUntil = millis() + 700;
+                currentScreen = SCREEN_SETTINGS_DONE;
+                okPress = false;
+                break;
+
+            case ANIME_ACTION_CANCEL:
+                currentScreen = SCREEN_HOME;
+                okPress = false;
+                break;
+        }
+    }
+
+    display.drawStr(22, 26, "Finish?");
+    display.drawStr(14, 40, selectedAnimeAction == ANIME_ACTION_DONE ? "> Done" : "  Done");
+    display.drawStr(14, 52, selectedAnimeAction == ANIME_ACTION_CANCEL ? "> Cancel" : "  Cancel");
+}
+
+if(currentScreen == SCREEN_SETTINGS_DONE)
+{
+    display.setFont(u8g2_font_5x7_tr);
+    display.drawStr(24, 40, "Done");
+
+    if(millis() > selectionDoneUntil)
+        currentScreen = SCREEN_HOME;
 }
 
 if(currentScreen == SCREEN_ABOUT)

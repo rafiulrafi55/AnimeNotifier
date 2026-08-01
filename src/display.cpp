@@ -16,7 +16,11 @@ void displayInit()
     display.begin();
 
     display.clearBuffer();
-    display.setFont(u8g2_font_4x6_tr);
-    display.drawStr(20, 32, "AnimeNotify");
+    display.setFont(u8g2_font_5x7_tr);
+    display.drawStr(20, 20, "AnimeNotifier");
+    display.drawStr(34, 34, "By Rafi");
+    display.drawStr(14, 48, "github/rafiulrafi55");
     display.sendBuffer();
+
+    delay(2500);
 }

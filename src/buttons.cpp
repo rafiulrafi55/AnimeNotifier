@@ -2,6 +2,7 @@
 
 
 unsigned long okStart = 0;
+unsigned long okCooldownUntil = 0;
 
 bool okLast = HIGH;
 bool leftLast = HIGH;
@@ -43,16 +44,30 @@ void buttonsUpdate()
 
     if(ok == HIGH && okLast == LOW)
 {
-    if(millis() - okLastTime > DEBOUNCE_MS)
-    {
-        okLastTime = millis();
+    unsigned long now = millis();
 
-        unsigned long duration = millis() - okStart;
+    if(now - okLastTime > DEBOUNCE_MS)
+    {
+        okLastTime = now;
+
+        if(now < okCooldownUntil)
+        {
+            okLast = ok;
+            leftLast = left;
+            rightLast = right;
+            return;
+        }
+
+        unsigned long duration = now - okStart;
 
         if(duration > 1000)
             okLongEvent = true;
         else
+        {
             okEvent = true;
+
+            okCooldownUntil = now + 450;
+        }
     }
 }
 
@@ -83,8 +98,6 @@ void buttonsUpdate()
 
 bool okPressed()
 {
-    buttonsUpdate();
-
     if(okEvent)
     {
         okEvent = false;
@@ -98,8 +111,6 @@ bool okPressed()
 
 bool okLongPressed()
 {
-    buttonsUpdate();
-
     if(okLongEvent)
     {
         okLongEvent = false;
@@ -113,8 +124,6 @@ bool okLongPressed()
 
 bool leftPressed()
 {
-    buttonsUpdate();
-
     if(leftEvent)
     {
         leftEvent = false;
@@ -128,8 +137,6 @@ bool leftPressed()
 
 bool rightPressed()
 {
-    buttonsUpdate();
-
     if(rightEvent)
     {
         rightEvent = false;

@@ -43,16 +43,6 @@ today.substring(8,10).toInt();
     return false;
 }
 
-// Shorten title for OLED
-String shortTitle(String text)
-{
-    if(text.length() > 12)
-        return text.substring(0,12);
-
-    return text;
-}
-
-
 // Convert YYYY-MM-DD to DD Mon
 String formatDate(String date)
 {
@@ -139,10 +129,7 @@ void fetchMovies()
         break;
 
 
-    movies[index].title =
-    shortTitle(
-        item["title"].as<String>()
-    );
+    movies[index].title = item["title"].as<String>();
 
 
     movies[index].date =
