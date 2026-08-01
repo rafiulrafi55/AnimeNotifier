@@ -11,6 +11,8 @@
 #include "anime.h"
 #include "anilist.h"
 #include "pins.h"
+#include <esp_sleep.h>
+#include <driver/gpio.h>
 
 
 bool wifiScanned = false;
@@ -26,10 +28,14 @@ unsigned long animeUpdateTimer = 0;
 
 bool moviesLoaded = false;
 bool animeLoaded = false;
+bool movieFetchFailed = false;
+bool animeFetchFailed = false;
 long selectedAnimeAlertAiringAt = 0;
 long selectedAnimeAlertMutedAiringAt = 0;
 bool selectedAnimeAlertBeepOn = false;
 unsigned long selectedAnimeAlertToggleAt = 0;
+unsigned long leftLedFlashStartedAt = 0;
+unsigned long leftLedFlashUntil = 0;
 
 const int RIGHT_LED_PWM_CHANNEL = 0;
 const int RIGHT_LED_PWM_FREQUENCY = 5000;
@@ -245,6 +251,57 @@ const unsigned char BATTERY_ICON_BITMAP[] PROGMEM = {
     0x00, 0x00, 0x00, 0x00,
 };
 
+const unsigned char ABOUT_SCREEN_BITMAP[] PROGMEM = {
+    0xE0, 0xFF, 0xFF, 0x07, 0x00,
+    0xF0, 0xFF, 0xFF, 0x0F, 0x00,
+    0xF8, 0xFF, 0xFF, 0x0F, 0x00,
+    0xF8, 0xFF, 0xFF, 0x0F, 0x00,
+    0xFC, 0xFF, 0xFF, 0x1F, 0x00,
+    0xFE, 0xFF, 0xFF, 0x7F, 0x00,
+    0xFE, 0xFF, 0xFF, 0xFF, 0x00,
+    0xFE, 0xFF, 0xFF, 0xFF, 0x01,
+    0xFF, 0xFF, 0xFF, 0xFF, 0x01,
+    0xFF, 0xFF, 0xFF, 0xFF, 0x01,
+    0xFF, 0xFF, 0xFF, 0xFE, 0x01,
+    0xFF, 0xFF, 0x3F, 0xFC, 0x00,
+    0xFF, 0xFF, 0x1F, 0x30, 0x00,
+    0xFF, 0xFF, 0x0F, 0x70, 0x00,
+    0xFE, 0xFF, 0x3F, 0xF8, 0x0F,
+    0xFE, 0xFF, 0xFF, 0xFF, 0x07,
+    0xFE, 0xE3, 0xFF, 0xFF, 0x05,
+    0xE6, 0xE3, 0xFF, 0xFF, 0x05,
+    0xC6, 0xC3, 0xFF, 0xFF, 0x05,
+    0x00, 0xC3, 0xFF, 0xFE, 0x04,
+    0x01, 0xC3, 0xFF, 0xFC, 0x04,
+    0x03, 0x82, 0x7F, 0xFC, 0x01,
+    0x67, 0x02, 0x7F, 0x78, 0x00,
+    0xC7, 0x02, 0x78, 0x00, 0x00,
+    0x0F, 0x02, 0x00, 0x00, 0x00,
+    0x1F, 0x02, 0x80, 0x38, 0x00,
+    0x1F, 0x06, 0xF8, 0xFF, 0x00,
+    0x7F, 0x06, 0xFC, 0xFD, 0x00,
+    0xFF, 0x0E, 0xFE, 0xFF, 0x00,
+    0x7F, 0x1C, 0x7C, 0x40, 0x00,
+    0x3F, 0x1C, 0x00, 0x00, 0x00,
+    0x1F, 0x3C, 0x00, 0x02, 0x00,
+    0x1F, 0x38, 0x00, 0x2E, 0x01,
+    0x1F, 0x38, 0x00, 0x3F, 0x00,
+    0x0F, 0x78, 0xF8, 0x3F, 0x00,
+    0x00, 0xF0, 0xFF, 0x3F, 0x00,
+    0x00, 0xC0, 0xFF, 0x3F, 0x00,
+    0x00, 0x00, 0xFE, 0x3F, 0x00,
+    0x00, 0x00, 0xE0, 0x0F, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00,
+};
+
+const char *ABOUT_INFO_LINES[] = {
+    "Created by Rafiul Rafi",
+    "rafiulrafi55@gmail.com",
+    "github/rafiulrafi55"
+};
+
+const int ABOUT_INFO_LINE_COUNT = 3;
+
 const unsigned long UPDATE_INTERVAL = 900000; 
 const unsigned long LOAD_RETRY_INTERVAL = 15000;
 // 15 minutes
@@ -299,10 +356,11 @@ enum DeviceSettingsItem
 {
     DEVICE_SETTING_BRIGHTNESS,
     DEVICE_SETTING_LED,
-    DEVICE_SETTING_BUZZER
+    DEVICE_SETTING_BUZZER,
+    DEVICE_SETTING_LOW_POWER
 };
 
-const int DEVICE_SETTINGS_COUNT = 3;
+const int DEVICE_SETTINGS_COUNT = 4;
 
 enum TitleSourceItem
 {
@@ -330,6 +388,7 @@ AnimeActionItem selectedAnimeAction = ANIME_ACTION_DONE;
 SelectionMode selectionMode = SELECTION_MODE_ANIME;
 RebootConfirmItem rebootConfirmItem = REBOOT_CONFIRM_NO;
 DeviceSettingsItem selectedDeviceSetting = DEVICE_SETTING_BRIGHTNESS;
+int aboutInfoLineIndex = 0;
 
 enum WifiMenuItem
 {
@@ -387,8 +446,22 @@ KeyboardMode keyboardMode = MODE_LOWER;
 int brightnessLevelIndex = 2;
 bool ledAlertsEnabled = true;
 bool buzzerAlertsEnabled = true;
+bool lowPowerModeEnabled = false;
+bool displaySleeping = false;
+unsigned long lastInteractionAt = 0;
+unsigned long wakeIgnoreUntil = 0;
+bool lowPowerManualOverrideOff = false;
 const uint8_t BRIGHTNESS_LEVELS[] = {64, 128, 192, 255};
 const int BRIGHTNESS_LEVEL_COUNT = sizeof(BRIGHTNESS_LEVELS) / sizeof(BRIGHTNESS_LEVELS[0]);
+const unsigned long LOW_POWER_DISPLAY_TIMEOUT = 120000;
+const unsigned long LOW_POWER_WAKE_IGNORE_MS = 600;
+
+void setRightLedBrightness(uint8_t duty);
+void enterLowPowerSleep();
+void refreshAutomaticLowPowerMode(int batteryLevel);
+void triggerLeftLedFlashPattern(unsigned long durationMs);
+bool displayedMoviesChanged(const String previousTitles[3], const String previousDates[3]);
+bool displayedAnimeChanged(const String previousTitles[3], const String previousTimes[3], const long previousAiringAt[3]);
 
 AnimeChoice seasonAnimeChoices[MAX_ANIME_CHOICES];
 int seasonAnimeCount = 0;
@@ -576,7 +649,34 @@ void saveUiSettings()
     prefs.putInt("brightness", brightnessLevelIndex);
     prefs.putBool("led", ledAlertsEnabled);
     prefs.putBool("buzzer", buzzerAlertsEnabled);
+    prefs.putBool("low_power", lowPowerModeEnabled);
     prefs.end();
+}
+
+int effectiveBrightnessLevelIndex()
+{
+    return lowPowerModeEnabled ? 0 : brightnessLevelIndex;
+}
+
+bool ledAlertsActive()
+{
+    return ledAlertsEnabled && !lowPowerModeEnabled;
+}
+
+bool buzzerAlertsActive()
+{
+    return buzzerAlertsEnabled && !lowPowerModeEnabled;
+}
+
+const char* brightnessLabelForIndex(int levelIndex)
+{
+    if(levelIndex <= 0)
+        return "Low";
+    if(levelIndex == 1)
+        return "Med";
+    if(levelIndex == 2)
+        return "High";
+    return "Max";
 }
 
 void applyDisplayBrightness()
@@ -587,7 +687,41 @@ void applyDisplayBrightness()
     if(brightnessLevelIndex >= BRIGHTNESS_LEVEL_COUNT)
         brightnessLevelIndex = BRIGHTNESS_LEVEL_COUNT - 1;
 
-    display.setContrast(BRIGHTNESS_LEVELS[brightnessLevelIndex]);
+    display.setContrast(BRIGHTNESS_LEVELS[effectiveBrightnessLevelIndex()]);
+}
+
+void applyLowPowerModeState()
+{
+    applyDisplayBrightness();
+
+    if(lowPowerModeEnabled)
+    {
+        selectedAnimeAlertBeepOn = false;
+        digitalWrite(BUZZER_PIN, LOW);
+        digitalWrite(LEFT_LED_PIN, LOW);
+        setRightLedBrightness(0);
+        lastInteractionAt = millis();
+    }
+    else
+    {
+        displaySleeping = false;
+        display.setPowerSave(0);
+    }
+}
+
+void enterLowPowerSleep()
+{
+    display.setPowerSave(1);
+    gpio_wakeup_enable(static_cast<gpio_num_t>(BTN_OK), GPIO_INTR_LOW_LEVEL);
+    esp_sleep_enable_gpio_wakeup();
+    esp_light_sleep_start();
+    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_GPIO);
+
+    displaySleeping = false;
+    display.setPowerSave(0);
+    applyDisplayBrightness();
+    lastInteractionAt = millis();
+    wakeIgnoreUntil = millis() + LOW_POWER_WAKE_IGNORE_MS;
 }
 
 void loadUiSettings()
@@ -596,6 +730,7 @@ void loadUiSettings()
     brightnessLevelIndex = prefs.getInt("brightness", brightnessLevelIndex);
     ledAlertsEnabled = prefs.getBool("led", true);
     buzzerAlertsEnabled = prefs.getBool("buzzer", true);
+    lowPowerModeEnabled = prefs.getBool("low_power", false);
     prefs.end();
 
     if(brightnessLevelIndex < 0)
@@ -652,7 +787,7 @@ void setRightLedBrightness(uint8_t duty)
     ledcWrite(RIGHT_LED_PWM_CHANNEL, duty);
 }
 
-void drawBatteryStatusIcon(U8G2 &oled, int x, int y, int width, int height, int batteryLevel)
+void drawBatteryStatusIcon(U8G2 &oled, int x, int y, int width, int height, int batteryLevel, bool lowPowerModeOn)
 {
     if(batteryLevel < 0)
         batteryLevel = 0;
@@ -675,6 +810,71 @@ void drawBatteryStatusIcon(U8G2 &oled, int x, int y, int width, int height, int 
 
     if(fillWidth > 0 && innerHeight > 0)
         oled.drawBox(x + innerPadding, y + innerPadding, fillWidth, innerHeight);
+
+    if(lowPowerModeOn)
+    {
+        oled.drawFrame(x - 2, y - 2, bodyWidth + tipWidth + 5, height + 4);
+        int boltX = x + (bodyWidth / 2) - 4;
+        int boltY = y + 5;
+        oled.drawPixel(boltX + 2, boltY);
+        oled.drawPixel(boltX + 1, boltY + 2);
+        oled.drawPixel(boltX + 4, boltY + 2);
+        oled.drawPixel(boltX + 3, boltY + 4);
+        oled.drawPixel(boltX + 2, boltY + 6);
+    }
+}
+
+void refreshAutomaticLowPowerMode(int batteryLevel)
+{
+    if(batteryLevel >= 11)
+    {
+        lowPowerManualOverrideOff = false;
+        return;
+    }
+
+    if(!lowPowerModeEnabled && !lowPowerManualOverrideOff)
+    {
+        lowPowerModeEnabled = true;
+        applyLowPowerModeState();
+        saveUiSettings();
+    }
+}
+
+void triggerLeftLedFlashPattern(unsigned long durationMs)
+{
+    leftLedFlashStartedAt = millis();
+    leftLedFlashUntil = leftLedFlashStartedAt + durationMs;
+}
+
+bool displayedMoviesChanged(const String previousTitles[3], const String previousDates[3])
+{
+    for(int i = 0; i < 3; i++)
+    {
+        if(previousTitles[i] != movies[i].title)
+            return true;
+
+        if(previousDates[i] != movies[i].date)
+            return true;
+    }
+
+    return false;
+}
+
+bool displayedAnimeChanged(const String previousTitles[3], const String previousTimes[3], const long previousAiringAt[3])
+{
+    for(int i = 0; i < 3; i++)
+    {
+        if(previousTitles[i] != animeList[i].title)
+            return true;
+
+        if(previousTimes[i] != animeList[i].time)
+            return true;
+
+        if(previousAiringAt[i] != animeList[i].airingAt)
+            return true;
+    }
+
+    return false;
 }
 
 void updateAlertOutputs(int batteryLevel)
@@ -685,8 +885,6 @@ void updateAlertOutputs(int batteryLevel)
     if(batteryLevel > 100)
         batteryLevel = 100;
 
-    bool leftLedOn = ledAlertsEnabled && batteryLevel < 20 && ((millis() / 500) % 2 == 0);
-
     bool shouldBeep = false;
 
     if(timeReady() && selectedAnimeAlertAiringAt > 0)
@@ -694,7 +892,7 @@ void updateAlertOutputs(int batteryLevel)
         time_t now = time(nullptr);
         time_t airingAt = selectedAnimeAlertAiringAt;
 
-        if(ledAlertsEnabled && now < airingAt && isSameLocalDay(now, airingAt))
+        if(ledAlertsActive() && now < airingAt && isSameLocalDay(now, airingAt))
         {
             const unsigned long pulseMs = 3000;
             const unsigned long gapMs = 60000;
@@ -727,7 +925,7 @@ void updateAlertOutputs(int batteryLevel)
             shouldBeep = true;
     }
 
-    if(shouldBeep && buzzerAlertsEnabled)
+    if(shouldBeep && buzzerAlertsActive())
     {
         const unsigned long beepInterval = 350;
 
@@ -750,12 +948,46 @@ void updateAlertOutputs(int batteryLevel)
         digitalWrite(BUZZER_PIN, LOW);
     }
 
+    bool leftLedOn = false;
+
+    if(wifiConnecting && WiFi.status() != WL_CONNECTED)
+    {
+        leftLedOn = ((millis() / 500) % 2) == 0;
+    }
+    else if(WiFi.status() == WL_CONNECTED && (!moviesLoaded || !animeLoaded))
+    {
+        leftLedOn = ((millis() / 700) % 2) == 0;
+    }
+    else if(wifiConnectionFailed)
+    {
+        unsigned long phase = millis() % 3000;
+        leftLedOn = phase < 180 || (phase >= 360 && phase < 540);
+    }
+    else if(movieFetchFailed || animeFetchFailed)
+    {
+        unsigned long phase = millis() % 2600;
+        leftLedOn = phase < 600;
+    }
+    else if(leftLedFlashUntil > millis())
+    {
+        unsigned long phase = millis() - leftLedFlashStartedAt;
+        leftLedOn = phase < 90 || (phase >= 180 && phase < 270);
+    }
+    else if(ledAlertsActive() && timeReady() && selectedAnimeAlertAiringAt > 0)
+    {
+        time_t now = time(nullptr);
+        time_t airingAt = selectedAnimeAlertAiringAt;
+
+        if(now < airingAt && isSameLocalDay(now, airingAt) && (airingAt - now) <= 300)
+            leftLedOn = ((millis() / 900) % 2) == 0;
+    }
+
     digitalWrite(LEFT_LED_PIN, leftLedOn ? HIGH : LOW);
 
-    if(!ledAlertsEnabled)
+    if(!ledAlertsActive())
         setRightLedBrightness(0);
 
-    if(!ledAlertsEnabled || !(timeReady() && selectedAnimeAlertAiringAt > 0 && isSameLocalDay(time(nullptr), selectedAnimeAlertAiringAt) && time(nullptr) < selectedAnimeAlertAiringAt))
+    if(!ledAlertsActive() || !(timeReady() && selectedAnimeAlertAiringAt > 0 && isSameLocalDay(time(nullptr), selectedAnimeAlertAiringAt) && time(nullptr) < selectedAnimeAlertAiringAt))
         setRightLedBrightness(0);
 }
 
@@ -1264,7 +1496,7 @@ void scanNetworks()
 {
     display.clearBuffer();
     String headerTime = currentTimeLabel();
-    drawHeader(display, batteryPercent(), headerTime.c_str(), "");
+    drawHeader(display, batteryPercent(), lowPowerModeEnabled, headerTime.c_str(), "");
 
     display.setFont(u8g2_font_5x7_tr);
     display.drawStr(20, 30, "Scanning...");
@@ -1300,6 +1532,8 @@ void setup()
 
     loadUiSettings();
     applyDisplayBrightness();
+    applyLowPowerModeState();
+    lastInteractionAt = millis();
 
     batteryInit();
 
@@ -1352,6 +1586,58 @@ void loop()
     bool rightPress = rightPressed();
     int batteryLevel = batteryPercent();
 
+    refreshAutomaticLowPowerMode(batteryLevel);
+
+    if(millis() < wakeIgnoreUntil)
+    {
+        okPress = false;
+        okLongPress = false;
+        leftPress = false;
+        rightPress = false;
+    }
+
+    bool anyInteraction = okPress || okLongPress || leftPress || rightPress;
+
+    if(lowPowerModeEnabled)
+    {
+        if(displaySleeping)
+        {
+            if(okPress)
+            {
+                displaySleeping = false;
+                display.setPowerSave(0);
+                applyDisplayBrightness();
+                lastInteractionAt = millis();
+            }
+
+            okPress = false;
+            okLongPress = false;
+            leftPress = false;
+            rightPress = false;
+        }
+        else
+        {
+            if(anyInteraction)
+                lastInteractionAt = millis();
+
+            if(millis() - lastInteractionAt >= LOW_POWER_DISPLAY_TIMEOUT)
+            {
+                displaySleeping = true;
+                enterLowPowerSleep();
+                okPress = false;
+                okLongPress = false;
+                leftPress = false;
+                rightPress = false;
+            }
+        }
+    }
+    else if(displaySleeping)
+    {
+        displaySleeping = false;
+        display.setPowerSave(0);
+        applyDisplayBrightness();
+    }
+
     display.clearBuffer();
     if(WiFi.status() == WL_CONNECTED)
 {
@@ -1363,17 +1649,22 @@ void loop()
 }
 
     String headerTime = currentTimeLabel();
-    drawHeader(display, batteryLevel, headerTime.c_str(), currentSSID.c_str());
+    drawHeader(display, batteryLevel, lowPowerModeEnabled, headerTime.c_str(), currentSSID.c_str());
 
     if(currentScreen == SCREEN_HOME && (leftPress || rightPress))
         silenceSelectedAnimeAlert();
-
-    updateAlertOutputs(batteryLevel);
 
     if(wifiConnecting && WiFi.status() != WL_CONNECTED && millis() - wifiConnectStart > 20000)
     {
         wifiConnecting = false;
         wifiConnectionFailed = true;
+    }
+
+    // Prioritize opening the menu before any network fetch work.
+    if(currentScreen == SCREEN_HOME && okPress)
+    {
+        currentScreen = SCREEN_MENU;
+        okPress = false;
     }
 
     if(WiFi.status() == WL_CONNECTED)
@@ -1389,55 +1680,92 @@ void loop()
 
         unsigned long now = millis();
 
-        unsigned long movieInterval = moviesLoaded ? UPDATE_INTERVAL : LOAD_RETRY_INTERVAL;
-        if(now - movieUpdateTimer > movieInterval)
+        // Keep title refresh timers active on all screens while connected.
         {
-            bool movieFetchOk = fetchMovies();
-            movieUpdateTimer = now;
-
-            if(movieFetchOk)
-                moviesLoaded = true;
-        }
-
-        unsigned long animeInterval = animeLoaded ? UPDATE_INTERVAL : LOAD_RETRY_INTERVAL;
-        if(now - animeUpdateTimer > animeInterval)
-        {
-            long previousSelectedAnimeAlertAiringAt = selectedAnimeAlertAiringAt;
-
-            bool animeFetchOk = fetchAnime();
-
-            if(animeFetchOk)
+            unsigned long movieInterval = moviesLoaded ? UPDATE_INTERVAL : LOAD_RETRY_INTERVAL;
+            if(now - movieUpdateTimer > movieInterval)
             {
-                if(selectedAnimeTitleCount > 0 && animeTitleIsSelected(animeList[0].title))
-                    selectedAnimeAlertAiringAt = animeList[0].airingAt;
-                else
-                    selectedAnimeAlertAiringAt = 0;
-
-                if(selectedAnimeAlertAiringAt != previousSelectedAnimeAlertAiringAt)
+                bool hadMovieRows = moviesLoaded;
+                String previousMovieTitles[3];
+                String previousMovieDates[3];
+                for(int i = 0; i < 3; i++)
                 {
-                    selectedAnimeAlertMutedAiringAt = 0;
-                    selectedAnimeAlertBeepOn = false;
-                    digitalWrite(BUZZER_PIN, LOW);
+                    previousMovieTitles[i] = movies[i].title;
+                    previousMovieDates[i] = movies[i].date;
                 }
 
-                animeLoaded = true;
+                bool movieFetchOk = fetchMovies();
+                movieUpdateTimer = now;
+
+                if(movieFetchOk)
+                {
+                    movieFetchFailed = false;
+
+                    if(hadMovieRows && displayedMoviesChanged(previousMovieTitles, previousMovieDates))
+                        triggerLeftLedFlashPattern(320);
+
+                    moviesLoaded = true;
+                }
+                else
+                {
+                    movieFetchFailed = true;
+                }
             }
 
-            animeUpdateTimer = now;
+            unsigned long animeInterval = animeLoaded ? UPDATE_INTERVAL : LOAD_RETRY_INTERVAL;
+            if(now - animeUpdateTimer > animeInterval)
+            {
+                long previousSelectedAnimeAlertAiringAt = selectedAnimeAlertAiringAt;
+                bool hadAnimeRows = animeLoaded;
+                String previousAnimeTitles[3];
+                String previousAnimeTimes[3];
+                long previousAnimeAiringAt[3];
+                for(int i = 0; i < 3; i++)
+                {
+                    previousAnimeTitles[i] = animeList[i].title;
+                    previousAnimeTimes[i] = animeList[i].time;
+                    previousAnimeAiringAt[i] = animeList[i].airingAt;
+                }
 
-            delay(500);
+                bool animeFetchOk = fetchAnime();
+
+                if(animeFetchOk)
+                {
+                    animeFetchFailed = false;
+
+                    if(selectedAnimeTitleCount > 0 && animeTitleIsSelected(animeList[0].title))
+                        selectedAnimeAlertAiringAt = animeList[0].airingAt;
+                    else
+                        selectedAnimeAlertAiringAt = 0;
+
+                    if(hadAnimeRows && displayedAnimeChanged(previousAnimeTitles, previousAnimeTimes, previousAnimeAiringAt))
+                        triggerLeftLedFlashPattern(320);
+
+                    if(selectedAnimeAlertAiringAt != previousSelectedAnimeAlertAiringAt)
+                    {
+                        selectedAnimeAlertMutedAiringAt = 0;
+                        selectedAnimeAlertBeepOn = false;
+                        digitalWrite(BUZZER_PIN, LOW);
+                    }
+
+                    animeLoaded = true;
+                }
+                else
+                {
+                    animeFetchFailed = true;
+                }
+
+                animeUpdateTimer = now;
+
+                delay(500);
+            }
         }
 
         if(currentScreen == SCREEN_WIFI_CONNECTING)
             currentScreen = SCREEN_HOME;
     }
 
-    // Home menu shortcut uses a single OK press.
-    if(currentScreen == SCREEN_HOME && okPress)
-    {
-        currentScreen = SCREEN_MENU;
-        okPress = false;
-    }
+    updateAlertOutputs(batteryLevel);
 
     // Keep long-press back behavior on deeper screens.
     if(okLongPress)
@@ -1602,6 +1930,7 @@ if(currentScreen == SCREEN_HOME)
                 break;
 
             case MAIN_MENU_ABOUT:
+                aboutInfoLineIndex = 0;
                 currentScreen = SCREEN_ABOUT;
                 okPress = false;
                 break;
@@ -1724,7 +2053,7 @@ if(currentScreen == SCREEN_SETTINGS_EMPTY)
                     selectedAnimeAlertBeepOn = false;
                     digitalWrite(BUZZER_PIN, LOW);
                 }
-                else
+                else if(!lowPowerModeEnabled)
                 {
                     digitalWrite(BUZZER_PIN, HIGH);
                     delay(70);
@@ -1732,29 +2061,34 @@ if(currentScreen == SCREEN_SETTINGS_EMPTY)
                 }
                 saveUiSettings();
                 break;
+
+            case DEVICE_SETTING_LOW_POWER:
+                lowPowerModeEnabled = !lowPowerModeEnabled;
+                if(lowPowerModeEnabled)
+                    lowPowerManualOverrideOff = false;
+                else
+                    lowPowerManualOverrideOff = true;
+                applyLowPowerModeState();
+                saveUiSettings();
+                break;
         }
 
         okPress = false;
     }
 
-    const char *brightnessLabel = "High";
-    if(brightnessLevelIndex <= 0)
-        brightnessLabel = "Low";
-    else if(brightnessLevelIndex == 1)
-        brightnessLabel = "Med";
-    else if(brightnessLevelIndex == 2)
-        brightnessLabel = "High";
-    else
-        brightnessLabel = "Max";
+    const char *brightnessLabel = brightnessLabelForIndex(effectiveBrightnessLevelIndex());
 
     String brightnessLine = String(selectedDeviceSetting == DEVICE_SETTING_BRIGHTNESS ? "> " : "  ") + "Brightness: " + brightnessLabel;
     display.drawStr(2, 24, brightnessLine.c_str());
 
-    String ledLine = String(selectedDeviceSetting == DEVICE_SETTING_LED ? "> " : "  ") + "LED Alerts: " + (ledAlertsEnabled ? "On" : "Off");
+    String ledLine = String(selectedDeviceSetting == DEVICE_SETTING_LED ? "> " : "  ") + "LED Alerts: " + (ledAlertsActive() ? "On" : "Off");
     display.drawStr(2, 34, ledLine.c_str());
 
-    String buzzerLine = String(selectedDeviceSetting == DEVICE_SETTING_BUZZER ? "> " : "  ") + "Buzzer: " + (buzzerAlertsEnabled ? "On" : "Off");
+    String buzzerLine = String(selectedDeviceSetting == DEVICE_SETTING_BUZZER ? "> " : "  ") + "Buzzer: " + (buzzerAlertsActive() ? "On" : "Off");
     display.drawStr(2, 44, buzzerLine.c_str());
+
+    String lowPowerLine = String(selectedDeviceSetting == DEVICE_SETTING_LOW_POWER ? "> " : "  ") + "Low Power: " + (lowPowerModeEnabled ? "On" : "Off");
+    display.drawStr(2, 54, lowPowerLine.c_str());
 }
 
 if(currentScreen == SCREEN_BATTERY_INFO)
@@ -1767,7 +2101,7 @@ if(currentScreen == SCREEN_BATTERY_INFO)
     snprintf(percentInfo, sizeof(percentInfo), "Charge: %d%%", batteryLevel);
 
     display.setFont(u8g2_font_5x7_tr);
-    drawBatteryStatusIcon(display, 34, 18, 60, 24, batteryLevel);
+    drawBatteryStatusIcon(display, 34, 18, 60, 24, batteryLevel, lowPowerModeEnabled);
     display.drawStr(26, 50, voltageInfo);
     display.drawStr(29, 60, percentInfo);
 }
@@ -2339,8 +2673,30 @@ if(currentScreen == SCREEN_SETTINGS_DONE)
 
 if(currentScreen == SCREEN_ABOUT)
 {
-    display.setFont(u8g2_font_5x7_tr);
-    display.drawStr(35,35,"About");
+    if(leftPress)
+    {
+        aboutInfoLineIndex--;
+        if(aboutInfoLineIndex < 0)
+            aboutInfoLineIndex = ABOUT_INFO_LINE_COUNT - 1;
+    }
+
+    if(rightPress)
+    {
+        aboutInfoLineIndex++;
+        if(aboutInfoLineIndex >= ABOUT_INFO_LINE_COUNT)
+            aboutInfoLineIndex = 0;
+    }
+
+    display.drawXBM(44, 18, 40, 40, ABOUT_SCREEN_BITMAP);
+
+    display.setFont(u8g2_font_4x6_tr);
+    const char *aboutLine = ABOUT_INFO_LINES[aboutInfoLineIndex];
+    int aboutTextWidth = display.getStrWidth(aboutLine);
+    int aboutTextX = (128 - aboutTextWidth) / 2;
+    if(aboutTextX < 0)
+        aboutTextX = 0;
+
+    display.drawStr(aboutTextX, 63, aboutLine);
 }
 
 

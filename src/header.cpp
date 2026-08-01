@@ -1,6 +1,6 @@
 #include "header.h"
 
-void drawHeader(U8G2 &display, int batteryLevel, const char *timeText, const char *ssid)
+void drawHeader(U8G2 &display, int batteryLevel, bool lowPowerModeOn, const char *timeText, const char *ssid)
 {
     if (batteryLevel > 100)
         batteryLevel = 100;
@@ -15,6 +15,15 @@ void drawHeader(U8G2 &display, int batteryLevel, const char *timeText, const cha
     if(fillWidth > 0)
     {
         display.drawBox(4, 5, fillWidth, 5);
+    }
+
+    if(lowPowerModeOn)
+    {
+        display.drawFrame(1, 2, 21, 11);
+        display.drawPixel(8, 5);
+        display.drawPixel(7, 7);
+        display.drawPixel(10, 7);
+        display.drawPixel(9, 9);
     }
 
     display.setFont(u8g2_font_5x7_tr);
