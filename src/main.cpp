@@ -342,8 +342,7 @@ enum MainMenuItem
 
 enum RebootActionItem
 {
-    REBOOT_ACTION_REBOOT,
-    REBOOT_ACTION_POWER_OFF
+    REBOOT_ACTION_REBOOT
 };
 
 enum SettingsMenuItem
@@ -439,8 +438,23 @@ const unsigned long DETAIL_AUTORETURN_OPTIONS[] = {0UL, 10000UL, 30000UL, 60000U
 const char *DETAIL_AUTORETURN_LABELS[] = {"Off", "10s", "30s", "60s"};
 const int DETAIL_AUTORETURN_COUNT = sizeof(DETAIL_AUTORETURN_OPTIONS) / sizeof(DETAIL_AUTORETURN_OPTIONS[0]);
 
-const unsigned long SCREEN_TIMEOUT_OPTIONS[] = {0UL, 30000UL, 60000UL, 120000UL, 300000UL};
-const char *SCREEN_TIMEOUT_LABELS[] = {"Off", "30s", "1m", "2m", "5m"};
+const unsigned long SCREEN_TIMEOUT_OPTIONS[] =
+{
+    0UL,
+    120000UL,
+    300000UL,
+    600000UL,
+    1800000UL
+};
+
+const char *SCREEN_TIMEOUT_LABELS[] =
+{
+    "Never",
+    "2m",
+    "5m",
+    "10m",
+    "30m"
+};
 const int SCREEN_TIMEOUT_COUNT = sizeof(SCREEN_TIMEOUT_OPTIONS) / sizeof(SCREEN_TIMEOUT_OPTIONS[0]);
 
 enum WifiMenuItem
@@ -510,7 +524,6 @@ const unsigned long LOW_POWER_WAKE_IGNORE_MS = 600;
 
 void setRightLedBrightness(uint8_t duty);
 void enterLowPowerSleep();
-void enterMenuPowerOffSleep();
 void refreshAutomaticLowPowerMode(int batteryLevel);
 void triggerLeftLedFlashPattern(unsigned long durationMs);
 bool displayedMoviesChanged(const String previousTitles[3], const String previousDates[3]);
@@ -770,41 +783,6 @@ void applyLowPowerModeState()
     }
 }
 
-void enterLowPowerSleep()
-{
-    display.setPowerSave(1);
-    gpio_wakeup_enable(static_cast<gpio_num_t>(BTN_OK), GPIO_INTR_LOW_LEVEL);
-    esp_sleep_enable_gpio_wakeup();
-    esp_light_sleep_start();
-    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_GPIO);
-
-    displaySleeping = false;
-    display.setPowerSave(0);
-    applyDisplayBrightness();
-    lastInteractionAt = millis();
-    wakeIgnoreUntil = millis() + LOW_POWER_WAKE_IGNORE_MS;
-}
-
-void enterMenuPowerOffSleep()
-{
-    digitalWrite(BUZZER_PIN, LOW);
-    digitalWrite(LEFT_LED_PIN, LOW);
-    setRightLedBrightness(0);
-
-    display.setPowerSave(1);
-    gpio_wakeup_enable(static_cast<gpio_num_t>(BTN_OK), GPIO_INTR_LOW_LEVEL);
-    esp_sleep_enable_gpio_wakeup();
-    esp_light_sleep_start();
-    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_GPIO);
-
-    display.setPowerSave(0);
-    currentScreen = SCREEN_HOME;
-    homeCursorActive = false;
-    displaySleeping = false;
-    applyDisplayBrightness();
-    lastInteractionAt = millis();
-    wakeIgnoreUntil = millis() + LOW_POWER_WAKE_IGNORE_MS;
-}
 
 void loadUiSettings()
 {
@@ -2024,6 +2002,22 @@ void scanNetworks()
     }
 }
 
+void enterLowPowerSleep()
+{
+    display.setPowerSave(1);
+
+    gpio_wakeup_enable((gpio_num_t)BTN_OK, GPIO_INTR_LOW_LEVEL);
+    esp_sleep_enable_gpio_wakeup();
+    esp_light_sleep_start();
+    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_GPIO);
+    syncTime();
+
+    displaySleeping = false;
+    display.setPowerSave(0);
+    applyDisplayBrightness();
+    lastInteractionAt = millis();
+    wakeIgnoreUntil = millis() + LOW_POWER_WAKE_IGNORE_MS;
+}
 
 void setup()
 {
@@ -2105,48 +2099,68 @@ void loop()
         rightPress = false;
     }
 
-    bool anyInteraction = okPress || okLongPress || leftPress || rightPress;
+bool anyInteraction = okPress || okLongPress || leftPress || rightPress;
 
-    if(lowPowerModeEnabled)
-    {
-        if(displaySleeping)
-        {
-            if(okPress)
-            {
-                displaySleeping = false;
-                display.setPowerSave(0);
-                applyDisplayBrightness();
-                lastInteractionAt = millis();
-            }
-
-            okPress = false;
-            okLongPress = false;
-            leftPress = false;
-            rightPress = false;
-        }
-        else
-        {
-            if(anyInteraction)
-                lastInteractionAt = millis();
-
-            unsigned long timeoutMs = screenTimeoutMs();
-            if(timeoutMs > 0 && millis() - lastInteractionAt >= timeoutMs)
-            {
-                displaySleeping = true;
-                enterLowPowerSleep();
-                okPress = false;
-                okLongPress = false;
-                leftPress = false;
-                rightPress = false;
-            }
-        }
-    }
-    else if(displaySleeping)
+if(displaySleeping)
+{
+    if(anyInteraction)
     {
         displaySleeping = false;
         display.setPowerSave(0);
         applyDisplayBrightness();
+        lastInteractionAt = millis();
     }
+
+    okPress = false;
+    okLongPress = false;
+    leftPress = false;
+    rightPress = false;
+}
+else
+{
+    if(anyInteraction)
+        lastInteractionAt = millis();
+
+    unsigned long timeoutMs = screenTimeoutMs();
+
+    if(timeoutMs > 0 &&
+   millis() - lastInteractionAt >= timeoutMs)
+{
+    displaySleeping = true;
+
+    if(lowPowerModeEnabled)
+    {
+        // Enter ESP light sleep
+        enterLowPowerSleep();
+    }
+    else
+    {
+        // Screen off only
+        display.setPowerSave(1);
+
+        while(true)
+        {
+            buttonsUpdate();
+
+            if(okPressed() || okLongPressed() ||
+               leftPressed() || rightPressed())
+                break;
+
+            delay(20);
+        }
+
+        displaySleeping = false;
+        display.setPowerSave(0);
+        applyDisplayBrightness();
+        lastInteractionAt = millis();
+    }
+
+    okPress = false;
+    okLongPress = false;
+    leftPress = false;
+    rightPress = false;
+}
+}
 
     display.clearBuffer();
     if(WiFi.status() == WL_CONNECTED)
@@ -2163,7 +2177,14 @@ void loop()
 
     if(currentScreen == SCREEN_HOME && (leftPress || rightPress))
     {
+       if(selectedAnimeAlertBeepOn)
+    {
         silenceSelectedAnimeAlert();
+
+        leftPress = false;
+        rightPress = false;
+    }
+    else{
 
         if(!homeCursorActive)
         {
@@ -2183,22 +2204,12 @@ void loop()
             homeCursorIndex = (homeCursorIndex + 1) % HOME_CURSOR_SLOT_COUNT;
         }
     }
+    }
 
     if(wifiConnecting && WiFi.status() != WL_CONNECTED && millis() - wifiConnectStart > 20000)
     {
         wifiConnecting = false;
         wifiConnectionFailed = true;
-    }
-
-    // Prioritize home actions before any network fetch work.
-    if(currentScreen == SCREEN_HOME && okPress)
-    {
-        if(homeCursorActive)
-            openHomeCursorDetails();
-        else
-            currentScreen = SCREEN_MENU;
-
-        okPress = false;
     }
 
     if(WiFi.status() == WL_CONNECTED)
@@ -2298,6 +2309,17 @@ void loop()
         if(currentScreen == SCREEN_WIFI_CONNECTING)
             currentScreen = SCREEN_HOME;
     }
+    if(currentScreen == SCREEN_HOME && okPress)
+    {
+        if(homeCursorActive)
+            openHomeCursorDetails();
+        else
+            currentScreen = SCREEN_MENU;
+
+        okPress = false;
+    }
+
+    
 
     updateAlertOutputs(batteryLevel);
 
@@ -2571,23 +2593,13 @@ if(currentScreen == SCREEN_TITLE_DETAILS)
 
 if(currentScreen == SCREEN_REBOOT_CONFIRM)
 {
-    display.setFont(u8g2_font_5x7_tr);
+   if(okPress)
+{
+    ESP.restart();
+    okPress = false;
+}
 
-    if(leftPress || rightPress)
-        rebootActionItem = rebootActionItem == REBOOT_ACTION_REBOOT ? REBOOT_ACTION_POWER_OFF : REBOOT_ACTION_REBOOT;
-
-    if(okPress)
-    {
-        if(rebootActionItem == REBOOT_ACTION_REBOOT)
-            ESP.restart();
-        else
-            enterMenuPowerOffSleep();
-
-        okPress = false;
-    }
-
-    display.drawStr(16, 40, rebootActionItem == REBOOT_ACTION_REBOOT ? "> Reboot" : "  Reboot");
-    display.drawStr(60, 40, rebootActionItem == REBOOT_ACTION_POWER_OFF ? "> Power off" : "  Power off");
+display.drawStr(32, 40, "> Reboot");
 }
 
 if(currentScreen == SCREEN_SETTINGS_EMPTY)

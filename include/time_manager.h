@@ -5,7 +5,7 @@
 
 void initTime();
 bool timeReady();
-
+void syncTime();
 String currentDate();
 
 #endif

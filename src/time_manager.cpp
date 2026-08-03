@@ -1,5 +1,5 @@
 #include "time_manager.h"
-
+#include <WiFi.h>
 #include <time.h>
 
 
@@ -14,6 +14,20 @@ const int daylightOffset_sec = 0;
 
 bool synced = false;
 
+void syncTime()
+{
+    if (WiFi.status() != WL_CONNECTED)
+        return;
+
+    configTime(
+        gmtOffset_sec,
+        daylightOffset_sec,
+        ntpServer
+    );
+
+    struct tm timeinfo;
+    getLocalTime(&timeinfo, 5000);
+}
 
 void initTime()
 {
